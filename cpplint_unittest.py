@@ -46,7 +46,7 @@ import unittest
 import cpplint
 
 try:
-  xrange(1, 0)
+  xrange
 except NameError:
   #  -- pylint: disable=redefined-builtin
   xrange = range
