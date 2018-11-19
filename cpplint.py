@@ -652,7 +652,7 @@ _quiet = False
 _line_length = 80
 
 try:
-  xrange(1, 0)
+  xrange
 except NameError:
   #  -- pylint: disable=redefined-builtin
   xrange = range
@@ -664,7 +664,7 @@ except NameError:
   basestring = unicode = str
 
 try:
-  long(2)
+  long
 except NameError:
   #  -- pylint: disable=redefined-builtin
   long = int
