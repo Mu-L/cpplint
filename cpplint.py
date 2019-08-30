@@ -2223,9 +2223,9 @@ def CheckHeaderFileIncluded(filename, include_state, error):
         if not first_include:
           first_include = f[1]
 
-    error(filename, first_include, 'build/include', 5,
-          '%s should include its header file %s' % (fileinfo.RepositoryName(),
-                                                    headername))
+  error(filename, first_include, 'build/include', 5,
+        '%s should include its header file %s' % (fileinfo.RepositoryName(),
+                                                  headername))
 
 
 def CheckForBadCharacters(filename, lines, error):
