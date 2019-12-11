@@ -6570,12 +6570,13 @@ def _ExpandDirectories(filenames):
 
   return filtered
 
-def _FilterExcludedFiles(filenames):
+def _FilterExcludedFiles(fnames):
   """Filters out files listed in the --exclude command line switch. File paths
   in the switch are evaluated relative to the current working directory
   """
   exclude_paths = [os.path.abspath(f) for f in _excludes]
-  return [f for f in filenames if os.path.abspath(f) not in exclude_paths]
+  # return [f for f in filenames if os.path.abspath(f) not in exclude_paths]
+  return [f for f in fnames if not [e for e in exclude_paths if os.path.abspath(f).startswith(e)]]
 
 def main():
   filenames = ParseArguments(sys.argv[1:])
