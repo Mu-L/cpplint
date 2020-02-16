@@ -67,6 +67,7 @@ The modifications in this fork are minor fixes and cosmetic changes:
 * JUnit XML output format
 * Overriding repository root auto-detection via --repository
 * Support ``#pragma once`` as an alternative to header include guards
+* multi process wrapper for cpplint - runnable via cpplint-multi
 
 
 Acknowledgements

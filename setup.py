@@ -49,6 +49,7 @@ setup(name='cpplint',
               'cpplint = cpplint:main'
           ]
       },
+      scripts=['cpplint-multi'],
       install_requires=[],
       url='https://github.com/cpplint/cpplint',
       download_url='https://github.com/cpplint/cpplint',
