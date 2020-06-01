@@ -59,7 +59,7 @@ import xml.etree.ElementTree
 # if empty, use defaults
 _valid_extensions = set([])
 
-__VERSION__ = '1.4.4'
+__VERSION__ = '1.5.0'
 
 try:
   xrange          # Python 2
@@ -514,6 +514,120 @@ _CPP_HEADERS = frozenset([
     'cwctype',
     ])
 
+# C headers
+_C_HEADERS = frozenset([
+    # System C headers
+    'assert.h',
+    'complex.h',
+    'ctype.h',
+    'errno.h',
+    'fenv.h',
+    'float.h',
+    'inttypes.h',
+    'iso646.h',
+    'limits.h',
+    'locale.h',
+    'math.h',
+    'setjmp.h',
+    'signal.h',
+    'stdalign.h',
+    'stdarg.h',
+    'stdatomic.h',
+    'stdbool.h',
+    'stddef.h',
+    'stdint.h',
+    'stdio.h',
+    'stdlib.h',
+    'stdnoreturn.h',
+    'string.h',
+    'tgmath.h',
+    'threads.h',
+    'time.h',
+    'uchar.h',
+    'wchar.h',
+    'wctype.h',
+    # POSIX C headers
+    'aio.h',
+    'arpa/inet.h',
+    'cpio.h',
+    'dirent.h',
+    'dlfcn.h',
+    'fcntl.h',
+    'fmtmsg.h',
+    'fnmatch.h',
+    'ftw.h',
+    'glob.h',
+    'grp.h',
+    'iconv.h',
+    'langinfo.h',
+    'libgen.h',
+    'monetary.h',
+    'mqueue.h',
+    'ndbm.h',
+    'net/if.h',
+    'netdb.h',
+    'netinet/in.h',
+    'netinet/tcp.h',
+    'nl_types.h',
+    'poll.h',
+    'pthread.h',
+    'pwd.h',
+    'regex.h',
+    'sched.h',
+    'search.h',
+    'semaphore.h',
+    'setjmp.h',
+    'signal.h',
+    'spawn.h',
+    'strings.h',
+    'stropts.h',
+    'syslog.h',
+    'tar.h',
+    'termios.h',
+    'trace.h',
+    'ulimit.h',
+    'unistd.h',
+    'utime.h',
+    'utmpx.h',
+    'wordexp.h',
+    # GNUlib headers
+    'a.out.h',
+    'aliases.h',
+    'alloca.h',
+    'ar.h',
+    'argp.h',
+    'argz.h',
+    'byteswap.h',
+    'crypt.h',
+    'endian.h',
+    'envz.h',
+    'err.h',
+    'error.h',
+    'execinfo.h',
+    'fpu_control.h',
+    'fstab.h',
+    'fts.h',
+    'getopt.h',
+    'gshadow.h',
+    'ieee754.h',
+    'ifaddrs.h',
+    'libintl.h',
+    'mcheck.h',
+    'mntent.h',
+    'obstack.h',
+    'paths.h',
+    'printf.h',
+    'pty.h',
+    'resolv.h',
+    'shadow.h',
+    'sysexits.h',
+    'ttyent.h',
+    # Hardware specific headers
+    'arm_neon.h',
+    'emmintrin.h',
+    'xmmintin.h',
+    ])
+
 # Type names
 _TYPES = re.compile(
     r'^(?:'
@@ -600,9 +714,10 @@ _ALT_TOKEN_REPLACEMENT_PATTERN = re.compile(
 # _IncludeState.CheckNextIncludeOrder().
 _C_SYS_HEADER = 1
 _CPP_SYS_HEADER = 2
-_LIKELY_MY_HEADER = 3
-_POSSIBLE_MY_HEADER = 4
-_OTHER_HEADER = 5
+_OTHER_SYS_HEADER = 3
+_LIKELY_MY_HEADER = 4
+_POSSIBLE_MY_HEADER = 5
+_OTHER_HEADER = 6
 
 # These constants define the current inline assembly state
 _NO_ASM = 0       # Outside of inline assembly block
@@ -852,11 +967,13 @@ class _IncludeState(object):
   _MY_H_SECTION = 1
   _C_SECTION = 2
   _CPP_SECTION = 3
-  _OTHER_H_SECTION = 4
+  _OTHER_SYS_SECTION = 4
+  _OTHER_H_SECTION = 5
 
   _TYPE_NAMES = {
       _C_SYS_HEADER: 'C system header',
       _CPP_SYS_HEADER: 'C++ system header',
+      _OTHER_SYS_HEADER: 'other system header',
       _LIKELY_MY_HEADER: 'header this file implements',
       _POSSIBLE_MY_HEADER: 'header this file may implement',
       _OTHER_HEADER: 'other header',
@@ -866,6 +983,7 @@ class _IncludeState(object):
       _MY_H_SECTION: 'a header this file implements',
       _C_SECTION: 'C system header',
       _CPP_SECTION: 'C++ system header',
+      _OTHER_SYS_SECTION: 'other system header',
       _OTHER_H_SECTION: 'other header',
       }
 
@@ -976,6 +1094,12 @@ class _IncludeState(object):
     elif header_type == _CPP_SYS_HEADER:
       if self._section <= self._CPP_SECTION:
         self._section = self._CPP_SECTION
+      else:
+        self._last_header = ''
+        return error_message
+    elif header_type == _OTHER_SYS_HEADER:
+      if self._section <= self._OTHER_SYS_SECTION:
+        self._section = self._OTHER_SYS_SECTION
       else:
         self._last_header = ''
         return error_message
@@ -4039,11 +4163,11 @@ def CheckBraces(filename, clean_lines, linenum, error):
   # its line, and the line after that should have an indent level equal to or
   # lower than the if. We also check for ambiguous if/else nesting without
   # braces.
-  if_else_match = Search(r'\b(if\s*\(|else\b)', line)
+  if_else_match = Search(r'\b(if\s*(|constexpr)\s*\(|else\b)', line)
   if if_else_match and not Match(r'\s*#', line):
     if_indent = GetIndentLevel(line)
     endline, endlinenum, endpos = line, linenum, if_else_match.end()
-    if_match = Search(r'\bif\s*\(', line)
+    if_match = Search(r'\bif\s*(|constexpr)\s*\(', line)
     if if_match:
       # This could be a multiline if condition, so find the end first.
       pos = if_match.end() - 1
@@ -4725,6 +4849,8 @@ def _ClassifyInclude(fileinfo, include, is_system):
     _C_SYS_HEADER
     >>> _ClassifyInclude(FileInfo('foo/foo.cc'), 'string', True)
     _CPP_SYS_HEADER
+    >>> _ClassifyInclude(FileInfo('foo/foo.cc'), 'foo/foo.h', True)
+    _OTHER_SYS_HEADER
     >>> _ClassifyInclude(FileInfo('foo/foo.cc'), 'foo/foo.h', False)
     _LIKELY_MY_HEADER
     >>> _ClassifyInclude(FileInfo('foo/foo_unknown_extension.cc'),
@@ -4737,6 +4863,9 @@ def _ClassifyInclude(fileinfo, include, is_system):
   # those already checked for above.
   is_cpp_h = include in _CPP_HEADERS
 
+  # Mark include as C header if in list or of type 'sys/*.h'.
+  is_c_h = include in _C_HEADERS or Search(r'sys\/.*\.h', include)
+
   # Headers with C++ extensions shouldn't be considered C system headers
   if is_system and os.path.splitext(include)[1] in ['.hpp', '.hxx', '.h++']:
     is_system = False
@@ -4744,8 +4873,10 @@ def _ClassifyInclude(fileinfo, include, is_system):
   if is_system:
     if is_cpp_h:
       return _CPP_SYS_HEADER
-    else:
+    if is_c_h:
       return _C_SYS_HEADER
+    else:
+      return _OTHER_SYS_HEADER
 
   # If the target file and the include we're checking share a
   # basename when we drop common extensions, and the include
@@ -5766,18 +5897,19 @@ def UpdateIncludeState(filename, include_dict, io=codecs):
   """
   headerfile = None
   try:
-    headerfile = io.open(filename, 'r', 'utf8', 'replace')
+    with io.open(filename, 'r', 'utf8', 'replace') as headerfile:
+      linenum = 0
+      for line in headerfile:
+        linenum += 1
+        clean_line = CleanseComments(line)
+        match = _RE_PATTERN_INCLUDE.search(clean_line)
+        if match:
+          include = match.group(2)
+          include_dict.setdefault(include, linenum)
+    return True
   except IOError:
     return False
-  linenum = 0
-  for line in headerfile:
-    linenum += 1
-    clean_line = CleanseComments(line)
-    match = _RE_PATTERN_INCLUDE.search(clean_line)
-    if match:
-      include = match.group(2)
-      include_dict.setdefault(include, linenum)
-  return True
+
 
 
 def CheckForIncludeWhatYouUse(filename, clean_lines, include_state, error,
@@ -6354,7 +6486,8 @@ def ProcessFile(filename, vlevel, extra_check_functions=None):
                                         codecs.getwriter('utf8'),
                                         'replace').read().split('\n')
     else:
-      lines = codecs.open(filename, 'r', 'utf8', 'replace').read().split('\n')
+      with codecs.open(filename, 'r', 'utf8', 'replace') as target_file:
+        lines = target_file.read().split('\n')
 
     # Remove trailing '\r'.
     # The -1 accounts for the extra trailing blank line we get from split()

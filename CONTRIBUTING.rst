@@ -73,14 +73,14 @@ To release a new version:
     # prepare files for release
     vi cpplint.py # increment the version
     vi changelog.rst # log changes
-    git commit -m "Releasing x.y.z"
     git add cpplint.py changelog.rst
+    git commit -m "Releasing x.y.z"
     # test-release (on env by mkvirtualenv -p /usr/bin/python3)
     pip install --upgrade setuptools wheel twine
+    python3 setup.py sdist bdist_wheel
     twine upload --repository testpypi dist/*
     # ... Check website and downloads from https://test.pypi.org/project/cpplint/
     # Actual release
-    python3 setup.py sdist bdist_wheel
     twine upload dist/*
     git tag x.y.z
     git push

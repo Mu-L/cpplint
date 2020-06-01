@@ -1,6 +1,30 @@
 Changelog
 ---------
 
+1.5.0
+-----
+
+* Fix #43 false positives in header include order by checking includes against a list of c headers.
+  Since this interprets certain include lines different than before, output about header include order changes.
+
+1.4.6
+-----
+
+* Fix #135: allow 'if constexpr' in readability/braces.
+* Fix runtime warning: Close files after reading contents
+
+1.4.5
+-----
+
+* Avoid false positive for [build/include_what_you_use] in case of `foo.set<type>` and `foo->set<type>` usage.
+* Avoid false positive for [build/include_what_you_use] in case of `map` is user defined function
+* Escape backslashes in pydoc strings to get rid of DeprecationWarning.
+* Fix false positive "should include its header" for 3rd party headers
+* Add support for c++17 tuple destructuring
+* fix #123: Inconsistent behavior of --headers and --extensions
+* Fix #114: --exclude not working recursively
+* fix #112, identifying of copy constructors should allow combinations of volatile and const
+
 1.4.4
 -----
 
@@ -14,7 +38,6 @@ Another cleanup release
 -----
 
 * Revert "Fix the `build/endif_comment` check", same as reverted in upstream
-
 
 1.4.2
 -----
