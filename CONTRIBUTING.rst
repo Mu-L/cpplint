@@ -6,7 +6,7 @@ Thanks for your interest in contributing to cpplint.
 Any kinds of contributions are welcome: Bug reports, Documentation, Patches.
 
 However cpplint is a bit special as a project because it aims to closely follow what Google does in the upstream repository.
-That means Google remains the source of all major requirements and functinoality of cpplint, where as this fork adds extensions to cpplint run on more environments and in more companies.
+That means Google remains the source of all major requirements and functionality of cpplint, where as this fork adds extensions to cpplint run on more environments and in more companies.
 The difference between this cpplint and Google should remain so small that anyone can at a glance see there is no added change that could be regarded as a security vulnerability.
 
 Here are some tips to make best use of your time:
@@ -29,19 +29,19 @@ Non-Goals:
 Development
 -----------
 
-For many tasks, it is okay to just develop using a single installed python version. But if you need to test/debug the project in multiple python versions, you need to install those version::
+For many tasks, it is okay to just develop using a single installed python version. But if you need to test/debug the project in multiple python versions, you need to install those version:
 
 1. (Optional) Install multiple python versions
 
    1. (Optional) Install [pyenv](https://github.com/pyenv/pyenv-installer) to manage python versions
-   2. (Optional) Using pyenv, install the python versions used in testing::
+   2. (Optional) Using pyenv, install the python versions used in testing:
 
         pyenv install 2.7.16
         pyenv install 3.6.8
 
 It may be okay to run and test python against locally installed libraries, but if you need to have a consistent build, it is recommended to manage your environment using virtualenv: [virtualenv](https://virtualenv.pypa.io/en/latest/ ), [virtualenvwrapper](https://pypi.org/project/virtualenvwrapper/ ):
 
-1. (Optional) Setup a local virtual environment with all necessary tools and libraries::
+1. (Optional) Setup a local virtual environment with all necessary tools and libraries:
 
       mkvirtualenv cpplint [-p /usr/bin/python3]
       pip install .[dev]
@@ -61,7 +61,7 @@ You can setup your local environment for developing patches for cpplint like thi
     ./setup.py lint
     ./setup.py style
     ./setup.py ci # all the above
-    ./tox    # all of the above in all python environments
+    tox    # all of the above in all python environments
 
 Releasing
 ---------
