@@ -1341,7 +1341,7 @@ class _CppLintState(object):
       self.PrintInfo('Category \'%s\' errors found: %d\n' %
                        (category, count))
     if self.error_count > 0:
-      self.PrintInfo('Total errors found: %d\n' % self.error_count)
+      self.PrintError('Total errors found: %d\n' % self.error_count)
 
   def PrintInfo(self, message):
     if not _quiet and self.output_format != 'junit':
@@ -6666,7 +6666,7 @@ def ProcessFile(filename, vlevel, extra_check_functions=None):
   # Suppress printing anything if --quiet was passed unless the error
   # count has increased after processing this file.
   if not _cpplint_state.quiet or old_errors != _cpplint_state.error_count:
-    _cpplint_state.PrintInfo('Done processing %s\n' % filename)
+    _cpplint_state.PrintError('Done processing %s\n' % filename)
   _RestoreFilters()
 
 
