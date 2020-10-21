@@ -54,6 +54,11 @@ For full usage instructions, run:
 
     $ cpplint --help
 
+CI
+==
+
+You can use cpplint withing CI jobs as a Github action or with any CI tool using [Mega-Linter](https://github.com/nvuillam/mega-linter)
+
 Changes
 -------
 
