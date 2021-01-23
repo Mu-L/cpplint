@@ -1,0 +1,7 @@
+- id: cpplint
+  name: cpplint
+  description: Check style of C code using cpplint.
+  language: python
+  types_or: [c++, c]
+  entry: cpplint
+  minimum_pre_commit_version: 2.9.2
