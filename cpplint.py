@@ -1248,6 +1248,7 @@ class _CppLintState(object):
   def __init__(self):
     self.verbose_level = 1  # global setting.
     self.error_count = 0    # global count of reported errors
+    self.err_msg_list = [] # cpplint err msg detail
     # filters to apply when emitting error messages
     self.filters = _DEFAULT_FILTERS[:]
     # backup of filter list. Used to restore the state after each file.
@@ -1331,6 +1332,11 @@ class _CppLintState(object):
     """Sets the module's error statistic back to zero."""
     self.error_count = 0
     self.errors_by_category = {}
+    self.err_msg_list = []
+
+  def IncrementMsgInfo(self, msg_info):
+    """ Store err msg info into list """
+    self.err_msg_list.append(msg_info)
 
   def IncrementErrorCount(self, category):
     """Bumps the module's error statistic."""
@@ -1704,6 +1710,11 @@ def Error(filename, linenum, category, confidence, message):
   """
   if _ShouldPrintError(category, confidence, linenum):
     _cpplint_state.IncrementErrorCount(category)
+
+    err_info = {"filename": filename, "linenum": linenum,
+                "message": message, "category": category, "confidence": confidence}
+    _cpplint_state.IncrementMsgInfo(err_info)
+
     if _cpplint_state.output_format == 'vs7':
       _cpplint_state.PrintError('%s(%s): error cpplint: [%s] %s [%d]\n' % (
           filename, linenum, category, message, confidence))
@@ -6873,8 +6884,8 @@ def _IsParentOrSame(parent, child):
   child_suffix = child_suffix.lstrip(os.sep)
   return child == os.path.join(prefix, child_suffix)
 
-def main():
-  filenames = ParseArguments(sys.argv[1:])
+def main(arg_list):
+  filenames = ParseArguments()
   backup_err = sys.stderr
   try:
     # Change stderr to write with replacement characters so we don't die
@@ -6893,9 +6904,11 @@ def main():
 
   finally:
     sys.stderr = backup_err
-
-  sys.exit(_cpplint_state.error_count > 0)
+  result = {"err_msg_list": _cpplint_state.err_msg_list,
+              "rtn": int(_cpplint_state.error_count > 0)}
+  return result
 
 
 if __name__ == '__main__':
-  main()
+  main_result = main(sys.argv[1:])
+  sys.exit(main_result.get("rtn",0))
