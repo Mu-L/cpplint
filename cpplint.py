@@ -3225,7 +3225,7 @@ class NestingState(object):
         # already saw a closing parenthesis, then these are probably
         # function arguments with extra "class" or "struct" keywords.
         # Also pop these stack for these.
-        if not self.SeenOpenBrace():
+        while not self.SeenOpenBrace():
           self.stack.pop()
       else:  # token == '}'
         # Perform end of block checks and pop the stack.
