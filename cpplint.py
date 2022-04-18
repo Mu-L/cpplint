@@ -6815,6 +6815,8 @@ def ParseArguments(args):
     elif opt == '--config':
       global _config_filename
       _config_filename = val
+      if os.path.basename(_config_filename) != _config_filename:
+        PrintUsage('Config file name must not include directory components.')
 
   if not filenames:
     PrintUsage('No files were specified.')
