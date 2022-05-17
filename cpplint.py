@@ -83,6 +83,7 @@ Syntax: cpplint.py [--verbose=#] [--output=emacs|eclipse|vs7|junit|sed|gsed]
                    [--exclude=path]
                    [--extensions=hpp,cpp,...]
                    [--includeorder=default|standardcfirst]
+                   [--allowunapproved]
                    [--quiet]
                    [--version]
         <file> [file] ...
@@ -123,6 +124,9 @@ Syntax: cpplint.py [--verbose=#] [--output=emacs|eclipse|vs7|junit|sed|gsed]
       Specify a number 0-5 to restrict errors to certain verbosity levels.
       Errors with lower verbosity levels have lower confidence and are more
       likely to be false positives.
+
+    allowunapproved
+      Don't check for unapproved C++11 or C++14 features.
 
     quiet
       Don't print anything if no errors are found.
@@ -866,6 +870,9 @@ _repository = None
 # Files to exclude from linting. This is set by the --exclude flag.
 _excludes = None
 
+# Skip checks for 'unapproved' headers
+_allow_unapproved = False
+
 # Whether to supress all PrintInfo messages, UNRELATED to --quiet flag
 _quiet = False
 
@@ -1259,6 +1266,7 @@ class _CppLintState(object):
     self._filters_backup = self.filters[:]
     self.counting = 'total'  # In what way are we counting errors?
     self.errors_by_category = {}  # string to int dict storing error counts
+    self.allow_unapproved = False  # Skip checks for unapproved C++11 and C++14 headers
     self.quiet = False  # Suppress non-error messagess?
 
     # output format:
@@ -1278,6 +1286,12 @@ class _CppLintState(object):
   def SetOutputFormat(self, output_format):
     """Sets the output format for errors."""
     self.output_format = output_format
+
+  def SetAllowUnapproved(self, allow_unapproved):
+    """Sets the module's allow_unapproved settings, and returns the previous setting."""
+    last_allow_unapproved = self.allow_unapproved
+    self.allow_unapproved = allow_unapproved
+    return last_allow_unapproved
 
   def SetQuiet(self, quiet):
     """Sets the module's quiet settings, and returns the previous setting."""
@@ -1434,6 +1448,14 @@ def _Quiet():
 def _SetQuiet(quiet):
   """Set the module's quiet status, and return previous setting."""
   return _cpplint_state.SetQuiet(quiet)
+
+def _AllowUnapproved():
+  """Return's the module's allow_unapproved setting."""
+  return _cpplint_state.allow_unapproved
+
+def _SetAllowUnapproved(allow_unapproved):
+  """Set the module's allow_unapproved status, and return previous setting."""
+  return _cpplint_state.SetAllowUnapproved(allow_unapproved)
 
 
 def _VerboseLevel():
@@ -6493,7 +6515,8 @@ def ProcessFileData(filename, file_extension, lines, error,
     ProcessLine(filename, file_extension, clean_lines, line,
                 include_state, function_state, nesting_state, error,
                 extra_check_functions)
-    FlagCxx11Features(filename, clean_lines, line, error)
+    if not _AllowUnapproved():
+      FlagCxx11Features(filename, clean_lines, line, error)
   nesting_state.CheckCompletedBlocks(filename, error)
 
   CheckForIncludeWhatYouUse(filename, clean_lines, include_state, error)
@@ -6746,6 +6769,7 @@ def ParseArguments(args):
                                                  'recursive',
                                                  'headers=',
                                                  'includeorder=',
+                                                 'allowunapproved',
                                                  'quiet'])
   except getopt.GetoptError:
     PrintUsage('Invalid arguments.')
@@ -6753,6 +6777,7 @@ def ParseArguments(args):
   verbosity = _VerboseLevel()
   output_format = _OutputFormat()
   filters = ''
+  allow_unapproved = _AllowUnapproved()
   quiet = _Quiet()
   counting_style = ''
   recursive = False
@@ -6769,6 +6794,8 @@ def ParseArguments(args):
       output_format = val
     elif opt == '--quiet':
       quiet = True
+    elif opt == '--allowunapproved':
+      allow_unapproved = True
     elif opt == '--verbose' or opt == '--v':
       verbosity = int(val)
     elif opt == '--filter':
@@ -6816,6 +6843,7 @@ def ParseArguments(args):
 
   _SetOutputFormat(output_format)
   _SetQuiet(quiet)
+  _SetAllowUnapproved(allow_unapproved)
   _SetVerboseLevel(verbosity)
   _SetFilters(filters)
   _SetCountingStyle(counting_style)
