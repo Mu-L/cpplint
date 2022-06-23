@@ -1,6 +1,11 @@
 Changelog
 =========
 
+1.6.1 (2022-06-23)
+-----
+
+* Fix #194: "Why was regex (and other C++11 headers) unapproved?"
+
 1.6.0 (2022-02-19)
 -----
 
