@@ -67,6 +67,7 @@ _valid_extensions = set([])
 __VERSION__ = '1.6.0'
 
 try:
+  #  -- pylint: disable=used-before-assignment
   xrange          # Python 2
 except NameError:
   #  -- pylint: disable=redefined-builtin
@@ -877,12 +878,14 @@ _line_length = 80
 _include_order = "default"
 
 try:
+  #  -- pylint: disable=used-before-assignment
   unicode
 except NameError:
   #  -- pylint: disable=redefined-builtin
   basestring = unicode = str
 
 try:
+  #  -- pylint: disable=used-before-assignment
   long
 except NameError:
   #  -- pylint: disable=redefined-builtin
