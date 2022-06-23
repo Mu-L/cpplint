@@ -85,6 +85,7 @@ Syntax: cpplint.py [--verbose=#] [--output=emacs|eclipse|vs7|junit|sed|gsed]
                    [--extensions=hpp,cpp,...]
                    [--includeorder=default|standardcfirst]
                    [--quiet]
+                   [--standardstd]
                    [--version]
         <file> [file] ...
 
@@ -127,6 +128,9 @@ Syntax: cpplint.py [--verbose=#] [--output=emacs|eclipse|vs7|junit|sed|gsed]
 
     quiet
       Don't print anything if no errors are found.
+
+    standardstd
+      Allow projects that use the standard C++ library to be checked.
 
     filter=-x,+y,...
       Specify a comma-separated list of category-filters to apply: only
@@ -869,6 +873,9 @@ _excludes = None
 
 # Whether to supress all PrintInfo messages, UNRELATED to --quiet flag
 _quiet = False
+
+# Whether use standard c++ libraries. This is set by the --standard flag.
+_standardstd = False
 
 # The allowed line length of files.
 # This is set by --linelength flag.
@@ -6407,17 +6414,17 @@ def FlagCxx11Features(filename, clean_lines, linenum, error):
           ('C++ TR1 headers such as <%s> are unapproved.') % include.group(1))
 
   # Flag unapproved C++11 headers.
-  if include and include.group(1) in ('cfenv',
-                                      'condition_variable',
-                                      'fenv.h',
-                                      'future',
-                                      'mutex',
-                                      'thread',
-                                      'chrono',
-                                      'ratio',
-                                      'regex',
-                                      'system_error',
-                                     ):
+  if not _standardstd and include and include.group(1) in ('cfenv',
+                                                            'condition_variable',
+                                                            'fenv.h',
+                                                            'future',
+                                                            'mutex',
+                                                            'thread',
+                                                            'chrono',
+                                                            'ratio',
+                                                            'regex',
+                                                            'system_error',
+                                                          ):
     error(filename, linenum, 'build/c++11', 5,
           ('<%s> is an unapproved C++11 header.') % include.group(1))
 
@@ -6748,7 +6755,8 @@ def ParseArguments(args):
                                                  'recursive',
                                                  'headers=',
                                                  'includeorder=',
-                                                 'quiet'])
+                                                 'quiet',
+                                                 'standardstd'])
   except getopt.GetoptError:
     PrintUsage('Invalid arguments.')
 
@@ -6771,6 +6779,9 @@ def ParseArguments(args):
       output_format = val
     elif opt == '--quiet':
       quiet = True
+    elif opt == '--standardstd':
+      global _standardstd
+      _standardstd = True
     elif opt == '--verbose' or opt == '--v':
       verbosity = int(val)
     elif opt == '--filter':
