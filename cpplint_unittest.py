@@ -950,6 +950,17 @@ class CpplintTest(CpplintTestBase):
 
   def testIncludeWhatYouUse(self):
     self.TestIncludeWhatYouUse(
+        'std::filesystem::copy(from, to);',
+        '')
+    self.TestIncludeWhatYouUse(
+        'void copy(from, to);',
+        '')
+    self.TestIncludeWhatYouUse(
+        """
+           std::copy(vec.begin(), vec.end.(), std::back_inserter(dst));
+        """,
+        'Add #include <algorithm> for std::copy  [build/include_what_you_use] [4]')
+    self.TestIncludeWhatYouUse(
         """#include <vector>
            std::vector<int> foo;
         """,

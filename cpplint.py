@@ -5936,7 +5936,7 @@ _HEADERS_CONTAINING_TEMPLATES = (
     )
 
 _HEADERS_MAYBE_TEMPLATES = (
-    ('<algorithm>', ('copy', 'max', 'min', 'min_element', 'sort',
+    ('<algorithm>', ('std::copy', 'max', 'min', 'min_element', 'sort',
                      'transform',
                     )),
     ('<utility>', ('forward', 'make_pair', 'move', 'swap')),
