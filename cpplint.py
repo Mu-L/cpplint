@@ -101,7 +101,9 @@ Syntax: cpplint.py [--verbose=#] [--output=emacs|eclipse|vs7|junit|sed|gsed]
   To suppress false-positive errors of certain categories, add a
   'NOLINT(category[, category...])' comment to the line.  NOLINT or NOLINT(*)
   suppresses errors of all categories on that line. To suppress categories
-  on the next line use NOLINTNEXTLINE instead of NOLINT.
+  on the next line use NOLINTNEXTLINE instead of NOLINT. To suppress errors in
+  a block of code 'NOLINTBEGIN(category[, category...])' comment to a line at
+  the start of the block and to end the block add a comment with 'NOLINTEND'
 
   The files passed in will be linted; at least one file must be provided.
   Default linted extensions are %s.
@@ -938,6 +940,33 @@ _hpp_headers = set([])
 # category should be suppressed for every line.
 _global_error_suppressions = {}
 
+class BlockErrorSuppressions(set):
+  """ Modified set that tracks which line a suppression block was started on """
+  def __init__(self, *args, **kwargs):
+    super().__init__(*args, **kwargs)
+    self._linenum = -1
+
+  def __str__(self):
+    if self.linenum < 0:
+      return 'NONE'
+    return 'Categories suppressed from line %s: %s' % \
+           (self.linenum, 'ALL' if None in self else ", ".join(c for c in self))
+
+  def clear(self):
+    super().clear()
+    self._linenum = -1
+
+  @property
+  def linenum(self):
+    return self._linenum
+
+  @linenum.setter
+  def linenum(self, linenum):
+    assert linenum > 0
+    self._linenum = linenum
+
+_block_error_suppressions = BlockErrorSuppressions()
+
 def ProcessHppHeadersOption(val):
   global _hpp_headers
   try:
@@ -996,19 +1025,41 @@ def ParseNolintSuppressions(filename, raw_line, linenum, error):
     linenum: int, the number of the current line.
     error: function, an error handler.
   """
-  matched = Search(r'\bNOLINT(NEXTLINE)?\b(\([^)]+\))?', raw_line)
+  matched = Search(r'\bNOLINT(NEXTLINE|BEGIN|END)?\b(\([^)]+\))?', raw_line)
   if matched:
-    if matched.group(1):
-      suppressed_line = linenum + 1
+    no_lint_type = matched.group(1)
+    if no_lint_type == 'NEXTLINE':
+      def process_category(category):
+        _error_suppressions.setdefault(category, set()).add(linenum + 1)
+    elif no_lint_type == 'BEGIN':
+      if _block_error_suppressions:
+        error(filename, linenum, 'readability/nolint', 5,
+              'NONLINT block already defined on line %s' % _block_error_suppressions.linenum)
+      else:
+        _block_error_suppressions.linenum = linenum
+
+      def process_category(category):
+        _block_error_suppressions.add(category)
+    elif no_lint_type == 'END':
+      if not _block_error_suppressions:
+        error(filename, linenum, 'readability/nolint', 5, 'Not in a NOLINT block')
+
+      def process_category(category):
+        if category is not None:
+          error(filename, linenum, 'readability/nolint', 5,
+                'NOLINT categories not supported in block END: %s' % category)
+        else:
+          _block_error_suppressions.clear()
     else:
-      suppressed_line = linenum
+      def process_category(category):
+        _error_suppressions.setdefault(category, set()).add(linenum)
     categories = matched.group(2)
     if categories in (None, '(*)'):  # => "suppress all"
-      _error_suppressions.setdefault(None, set()).add(suppressed_line)
+      process_category(None)
     elif categories.startswith('(') and categories.endswith(')'):
       for category in set(map(lambda c: c.strip(), categories[1:-1].split(','))):
         if category in _ERROR_CATEGORIES:
-          _error_suppressions.setdefault(category, set()).add(suppressed_line)
+          process_category(category)
         elif any(c for c in _OTHER_NOLINT_CATEGORY_PREFIXES if category.startswith(c)):
           # Ignore any categories from other tools.
           pass
@@ -1038,6 +1089,7 @@ def ProcessGlobalSuppresions(lines):
 def ResetNolintSuppressions():
   """Resets the set of NOLINT suppressions to empty."""
   _error_suppressions.clear()
+  _block_error_suppressions.clear()
   _global_error_suppressions.clear()
 
 
@@ -1051,10 +1103,12 @@ def IsErrorSuppressedByNolint(category, linenum):
     category: str, the category of the error.
     linenum: int, the current line number.
   Returns:
-    bool, True iff the error should be suppressed due to a NOLINT comment or
-    global suppression.
+    bool, True iff the error should be suppressed due to a NOLINT comment,
+    block suppression or global suppression.
   """
   return (_global_error_suppressions.get(category, False) or
+          None in _block_error_suppressions or
+          category in _block_error_suppressions or
           linenum in _error_suppressions.get(category, set()) or
           linenum in _error_suppressions.get(None, set()))
 
