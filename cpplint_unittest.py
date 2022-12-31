@@ -1030,7 +1030,7 @@ class CpplintTest(CpplintTestBase):
         '  [build/include_what_you_use] [4]')
     self.TestIncludeWhatYouUse(
         """#include "base/foobar.h"
-           bool foobar = min<int>(0,1);
+           bool foobar = std::min<int>(0,1);
         """,
         'Add #include <algorithm> for min  [build/include_what_you_use] [4]')
     self.TestIncludeWhatYouUse(
@@ -1044,18 +1044,23 @@ class CpplintTest(CpplintTestBase):
         '')  # Avoid false positives on strings in other namespaces.
     self.TestIncludeWhatYouUse(
         """#include "base/foobar.h"
-           bool foobar = swap(0,1);
+           bool foobar = std::swap(0,1);
         """,
         'Add #include <utility> for swap  [build/include_what_you_use] [4]')
     self.TestIncludeWhatYouUse(
         """#include "base/foobar.h"
-           bool foobar = transform(a.begin(), a.end(), b.start(), Foo);
+           bool foobar = std::transform(a.begin(), a.end(), b.start(), Foo);
         """,
         'Add #include <algorithm> for transform  '
         '[build/include_what_you_use] [4]')
     self.TestIncludeWhatYouUse(
         """#include "base/foobar.h"
-           bool foobar = min_element(a.begin(), a.end());
+           boost::range::transform(input, std::back_inserter(output), square);
+        """,
+        '') # Avoid false positives on transform in other namespaces.
+    self.TestIncludeWhatYouUse(
+        """#include "base/foobar.h"
+           bool foobar = std::min_element(a.begin(), a.end());
         """,
         'Add #include <algorithm> for min_element  '
         '[build/include_what_you_use] [4]')
