@@ -673,8 +673,18 @@ class CpplintTest(CpplintTestBase):
                              '// NOLINTEND(*)',
                              ''],
                             error_collector)
-    self.assertEquals('NONLINT block already defined on line 2  '
+    self.assertEqual('NONLINT block already defined on line 2  '
                       '[readability/nolint] [5]', error_collector.Results())
+    # error if NOLINGBEGIN is not ended
+    error_collector = ErrorCollector(self.assert_)
+    cpplint.ProcessFileData('test.cc', 'cc',
+                            ['// Copyright 2014 Your Company.',
+                             '// NOLINTBEGIN(readability/casting,runtime/int)',
+                             'long a = (int64) 65;',
+                             'long a = 65;',
+                             ''],
+                            error_collector)
+    self.assertEqual('NONLINT block never ended  [readability/nolint] [5]', error_collector.Results())
     # error if unmatched NOLINTEND
     self.TestLint(
         '// NOLINTEND',
