@@ -4466,6 +4466,7 @@ def CheckTrailingSemicolon(filename, clean_lines, linenum, error):
     #  - Lambdas
     #  - alignas specifier with anonymous structs
     #  - decltype
+    #  - concepts
     closing_brace_pos = match.group(1).rfind(')')
     opening_parenthesis = ReverseCloseExpression(
         clean_lines, linenum, closing_brace_pos)
@@ -4487,6 +4488,9 @@ def CheckTrailingSemicolon(filename, clean_lines, linenum, error):
         opening_parenthesis[1] > 1 and
         Search(r'\]\s*$', clean_lines.elided[opening_parenthesis[1] - 1])):
       # Multi-line lambda-expression
+      match = None
+
+    if match and line.startswith('concept'):
       match = None
 
   else:
