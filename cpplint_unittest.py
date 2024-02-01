@@ -127,13 +127,19 @@ class ErrorCollector(object):
         self._errors = self._errors[0:index] + self._errors[(index + 1):]
         break
 
-
 # This class is a lame mock of codecs. We do not verify filename, mode, or
 # encoding, but for the current use case it is not needed.
 class MockIo(object):
 
   def __init__(self, mock_file):
-    self.mock_file = mock_file
+    # wrap list to allow "with open(mock)"
+    class EnterableList(list):
+      def __enter__(self):
+        return self
+
+      def __exit__(self, type, value, tb):
+        return self
+    self.mock_file = EnterableList(mock_file)
 
   def open(self,  # pylint: disable=C6409
            unused_filename, unused_mode, unused_encoding, _):
@@ -345,7 +351,6 @@ class CpplintTest(CpplintTestBase):
 
     results = self.GetNamespaceResults(lines)
     self.assertEquals(results, '')
-
 
   # Test get line width.
   def testGetLineWidth(self):
@@ -627,6 +632,10 @@ class CpplintTest(CpplintTestBase):
         'uint64 a = (uint64)1.0;',
         'Using C-style cast.  Use static_cast<uint64>(...) instead'
         '  [readability/casting] [4]')
+    self.TestLint(
+        'size_t a = (size_t)1.0;',
+        'Using C-style cast.  Use static_cast<size_t>(...) instead'
+        '  [readability/casting] [4]')
 
     # These shouldn't be recognized casts.
     self.TestLint('u a = (u)NULL;', '')
@@ -644,6 +653,8 @@ class CpplintTest(CpplintTestBase):
     self.TestLint('void F(int (Class::member)(int*));', '')
     self.TestLint('void F(int (Class::member)(int), int param);', '')
     self.TestLint('void F(int (Class::member)(int*), int param);', '')
+    self.TestLint('X Class::operator++(int)', '')
+    self.TestLint('X Class::operator--(int)', '')
 
     # These should not be recognized (lambda functions without arg names).
     self.TestLint('[](int/*unused*/) -> bool {', '')
@@ -1244,20 +1255,19 @@ class CpplintTest(CpplintTestBase):
 
   def testRawStrings(self):
     self.TestMultiLineLint(
-      """
-      int main() {
-        struct A {
-           A(std::string s, A&& a);
-        };
-      }""",
+        """
+        int main() {
+          struct A {
+             A(std::string s, A&& a);
+          };
+        }""",
         '')
-
     self.TestMultiLineLint(
-      """
-      template <class T, class D = default_delete<T>> class unique_ptr {
-       public:
-          unique_ptr(unique_ptr&& u) noexcept;
-      };""",
+        """
+        template <class T, class D = default_delete<T>> class unique_ptr {
+         public:
+            unique_ptr(unique_ptr&& u) noexcept;
+        };""",
         '')
     self.TestMultiLineLint(
         """
@@ -1672,6 +1682,24 @@ class CpplintTest(CpplintTestBase):
       self.TestMultiLineLint(
           """
           class Foo {
+            Foo(volatile Foo&);
+          };""",
+          '')
+      self.TestMultiLineLint(
+          """
+          class Foo {
+            Foo(volatile const Foo&);
+          };""",
+          '')
+      self.TestMultiLineLint(
+          """
+          class Foo {
+            Foo(const volatile Foo&);
+          };""",
+          '')
+      self.TestMultiLineLint(
+          """
+          class Foo {
             Foo(Foo const&);
           };""",
           '')
@@ -1937,7 +1965,6 @@ class CpplintTest(CpplintTestBase):
     self.TestLint('  VLOG(WARNING)', errmsg)
     self.TestLint('  VLOG(FATAL)', errmsg)
     self.TestLint('  VLOG(DFATAL)', errmsg)
-
 
   # Test potential format string bugs like printf(foo).
   def testFormatStrings(self):
@@ -2682,6 +2709,14 @@ class CpplintTest(CpplintTestBase):
     self.TestLint('file_tocs_[i] = (FileToc) {a, b, c};', '')
     self.TestMultiLineLint('class X : public Y,\npublic Z {};', '')
 
+  def testSpacingBeforeBrackets(self):
+    self.TestLint('int numbers [] = { 1, 2, 3 };',
+                  'Extra space before [  [whitespace/braces] [5]')
+    # space allowed in some cases
+    self.TestLint('auto [abc, def] = func();', '')
+    self.TestLint('#define NODISCARD [[nodiscard]]', '')
+    self.TestLint('void foo(int param [[maybe_unused]]);', '')
+
   def testLambda(self):
     self.TestLint('auto x = []() {};', '')
     self.TestLint('return []() {};', '')
@@ -2931,7 +2966,6 @@ class CpplintTest(CpplintTestBase):
                   'Missing space around colon in range-based for loop'
                   '  [whitespace/forcolon] [2]')
 
-
   # Static or global STL strings.
   def testStaticOrGlobalSTLStrings(self):
     # A template for the error message for a const global/static string.
@@ -3154,8 +3188,8 @@ class CpplintTest(CpplintTestBase):
     self.TestLint('//====', '')
     self.TestLint('//////', '')
     self.TestLint('////// x', '')
-    self.TestLint('///< x', '') # After-member Doxygen comment
-    self.TestLint('//!< x', '') # After-member Doxygen comment
+    self.TestLint('///< x', '')  # After-member Doxygen comment
+    self.TestLint('//!< x', '')  # After-member Doxygen comment
     self.TestLint('////x', 'Should have a space between // and comment'
                   '  [whitespace/comments] [4]')
     self.TestLint('//}', '')
@@ -3250,9 +3284,9 @@ class CpplintTest(CpplintTestBase):
     error_collector = ErrorCollector(self.assert_)
     raw_bytes = codecs_latin_encode('\xe9x\0')
     if sys.version_info < (3,):
-          unidata = unicode(raw_bytes, 'utf8', 'replace')
+      unidata = unicode(raw_bytes, 'utf8', 'replace')
     else:
-          unidata = str(raw_bytes, 'utf8', 'replace')
+      unidata = str(raw_bytes, 'utf8', 'replace')
     cpplint.ProcessFileData(
         'nul_utf8.cc', 'cc',
         ['// Copyright 2014 Your Company.',
@@ -3689,14 +3723,31 @@ class CpplintTest(CpplintTestBase):
     self.TestLint(' protected: \\', '')
     self.TestLint('  public:      \\', '')
     self.TestLint('   private:   \\', '')
+    # examples using QT signals/slots macro
     self.TestMultiLineLint(
         TrimExtraIndent("""
             class foo {
              public slots:
               void bar();
+             signals:
             };"""),
-        'Weird number of spaces at line-start.  '
-        'Are you using a 2-space indent?  [whitespace/indent] [3]')
+        '')
+    self.TestMultiLineLint(
+        TrimExtraIndent("""
+            class foo {
+              public slots:
+              void bar();
+            };"""),
+        'public slots: should be indented +1 space inside class foo'
+        '  [whitespace/indent] [3]')
+    self.TestMultiLineLint(
+        TrimExtraIndent("""
+            class foo {
+              signals:
+              void bar();
+            };"""),
+        'signals: should be indented +1 space inside class foo'
+        '  [whitespace/indent] [3]')
     self.TestMultiLineLint(
         TrimExtraIndent('''
             static const char kRawString[] = R"("
@@ -3820,6 +3871,15 @@ class CpplintTest(CpplintTestBase):
           goto fail;""",
         'If/else bodies with multiple statements require braces'
         '  [readability/braces] [4]')
+    self.TestMultiLineLint(
+        """
+        if constexpr (foo) {
+          goto fail;
+          goto fail;
+        } else if constexpr (bar) {
+          hello();
+        }""",
+        '')
     self.TestMultiLineLint(
         """
         if (foo)
@@ -3981,6 +4041,22 @@ class CpplintTest(CpplintTestBase):
               [] { if (true); });
         }""",
         '')
+    self.TestMultiLineLint(
+        """
+        #if(A == 0)
+          foo();
+        #elif(A == 1)
+          bar();
+        #endif""",
+        '')
+    self.TestMultiLineLint(
+        """
+        #if (A == 0)
+          foo();
+        #elif (A == 1)
+          bar();
+        #endif""",
+        '')
 
   def testTab(self):
     self.TestLint('\tint a;',
@@ -4046,19 +4122,32 @@ class CpplintTest(CpplintTestBase):
       self.assertEquals(['foo.cc', 'foo.h'],
                         cpplint.ParseArguments(['foo.cc', 'foo.h']))
 
+      cpplint._hpp_headers = old_headers
+      cpplint._valid_extensions = old_valid_extensions
       self.assertEqual(['foo.h'],
                        cpplint.ParseArguments(['--linelength=120', 'foo.h']))
       self.assertEqual(120, cpplint._line_length)
+      self.assertEqual(set(['h', 'hh', 'hpp', 'hxx', 'h++', 'cuh']), cpplint.GetHeaderExtensions())  # Default value
 
+      cpplint._hpp_headers = old_headers
+      cpplint._valid_extensions = old_valid_extensions
+      self.assertEqual(['foo.h'],
+                       cpplint.ParseArguments(['--headers=h', 'foo.h']))
+      self.assertEqual(set(['h', 'c', 'cc', 'cpp', 'cxx', 'c++', 'cu']), cpplint.GetAllExtensions())
+
+      cpplint._hpp_headers = old_headers
+      cpplint._valid_extensions = old_valid_extensions
       self.assertEqual(['foo.h'],
                        cpplint.ParseArguments(['--extensions=hpp,cpp,cpp', 'foo.h']))
-      self.assertEqual(set(['hpp', 'cpp']), cpplint._valid_extensions)
+      self.assertEqual(set(['hpp', 'cpp']), cpplint.GetAllExtensions())
+      self.assertEqual(set(['hpp']), cpplint.GetHeaderExtensions())
 
-      self.assertEqual(set(['h', 'hh', 'hpp', 'hxx', 'h++', 'cuh']), cpplint._hpp_headers)  # Default value
+      cpplint._hpp_headers = old_headers
+      cpplint._valid_extensions = old_valid_extensions
       self.assertEqual(['foo.h'],
                        cpplint.ParseArguments(['--extensions=cpp,cpp', '--headers=hpp,h', 'foo.h']))
-      self.assertEqual(set(['hpp', 'h']), cpplint._hpp_headers)
-      self.assertEqual(set(['hpp', 'h', 'cpp']), cpplint._valid_extensions)
+      self.assertEqual(set(['hpp', 'h']), cpplint.GetHeaderExtensions())
+      self.assertEqual(set(['hpp', 'h', 'cpp']), cpplint.GetAllExtensions())
 
     finally:
       sys.stdout == sys.__stdout__
@@ -4072,7 +4161,7 @@ class CpplintTest(CpplintTestBase):
 
   def testRecursiveArgument(self):
     working_dir = os.getcwd()
-    temp_dir = tempfile.mkdtemp()
+    temp_dir = os.path.realpath(tempfile.mkdtemp())
     try:
       src_dir = os.path.join(temp_dir, "src")
       nested_dir = os.path.join(temp_dir, "src", "nested")
@@ -4083,6 +4172,7 @@ class CpplintTest(CpplintTestBase):
       os.chdir(temp_dir)
       expected = ['one.cpp', os.path.join('src', 'two.cpp'),
                   os.path.join('src', 'nested', 'three.cpp')]
+      cpplint._excludes = None
       actual = cpplint.ParseArguments(['--recursive', 'one.cpp', 'src'])
       self.assertEquals(set(expected), set(actual))
     finally:
@@ -4091,7 +4181,7 @@ class CpplintTest(CpplintTestBase):
 
   def testRecursiveExcludeInvalidFileExtension(self):
     working_dir = os.getcwd()
-    temp_dir = tempfile.mkdtemp()
+    temp_dir = os.path.realpath(tempfile.mkdtemp())
     try:
       src_dir = os.path.join(temp_dir, "src")
       os.makedirs(src_dir)
@@ -4100,36 +4190,66 @@ class CpplintTest(CpplintTestBase):
       open(os.path.join(src_dir, "three.cc"), 'w').close()
       os.chdir(temp_dir)
       expected = ['one.cpp', os.path.join('src', 'two.cpp')]
+      cpplint._excludes = None
       actual = cpplint.ParseArguments(['--recursive', '--extensions=cpp',
           'one.cpp', 'src'])
       self.assertEquals(set(expected), set(actual))
     finally:
         os.chdir(working_dir)
         shutil.rmtree(temp_dir)
-        cpplint._header_extensions = set([])
+        cpplint._hpp_headers = set([])
         cpplint._valid_extensions = set([])
 
-  def testExclude(self):
+  def testRecursiveExclude(self):
     working_dir = os.getcwd()
-    temp_dir = tempfile.mkdtemp()
+    temp_dir = os.path.realpath(tempfile.mkdtemp())
     try:
       src_dir = os.path.join(temp_dir, 'src')
+      src2_dir = os.path.join(temp_dir, 'src2')
       os.makedirs(src_dir)
+      os.makedirs(src2_dir)
       open(os.path.join(src_dir, 'one.cc'), 'w').close()
       open(os.path.join(src_dir, 'two.cc'), 'w').close()
       open(os.path.join(src_dir, 'three.cc'), 'w').close()
+      open(os.path.join(src2_dir, 'one.cc'), 'w').close()
+      open(os.path.join(src2_dir, 'two.cc'), 'w').close()
+      open(os.path.join(src2_dir, 'three.cc'), 'w').close()
       os.chdir(temp_dir)
 
+      expected = [
+        os.path.join('src', 'one.cc'),
+        os.path.join('src', 'two.cc'),
+        os.path.join('src', 'three.cc')
+      ]
+      cpplint._excludes = None
+      actual = cpplint.ParseArguments(['src'])
+      self.assertEquals(set(['src']), set(actual))
+
+      cpplint._excludes = None
+      actual = cpplint.ParseArguments(['--recursive', 'src'])
+      self.assertEquals(set(expected), set(actual))
+
       expected = [os.path.join('src', 'one.cc')]
+      cpplint._excludes = None
       actual = cpplint.ParseArguments(['--recursive',
           '--exclude=src{0}t*'.format(os.sep), 'src'])
       self.assertEquals(set(expected), set(actual))
 
       expected = [os.path.join('src', 'one.cc')]
+      cpplint._excludes = None
       actual = cpplint.ParseArguments(['--recursive',
           '--exclude=src/two.cc', '--exclude=src/three.cc', 'src'])
       self.assertEquals(set(expected), set(actual))
 
+      expected = set([
+        os.path.join('src2', 'one.cc'),
+        os.path.join('src2', 'two.cc'),
+        os.path.join('src2', 'three.cc')
+      ])
+      cpplint._excludes = None
+      actual = cpplint.ParseArguments(['--recursive',
+          '--exclude=src', '.'])
+      self.assertEquals(expected, set(actual))
     finally:
         os.chdir(working_dir)
         shutil.rmtree(temp_dir)
@@ -4284,7 +4404,7 @@ class CpplintTest(CpplintTestBase):
         'foo.' + extension, 'namespace {',
         'Do not use unnamed namespaces in header files.  See'
         ' https://google-styleguide.googlecode.com/svn/trunk/cppguide.xml#Namespaces'
-        ' for more information.  [build/namespaces] [4]')
+        ' for more information.  [build/namespaces_headers] [4]')
     # namespace registration macros are OK.
     self.TestLanguageRulesCheck('foo.' + extension, 'namespace {  \\', '')
     # named namespaces are OK.
@@ -4595,7 +4715,7 @@ class CpplintTest(CpplintTestBase):
     self.assertEquals([], error_collector.ResultList())
 
   def testBuildHeaderGuardWithRoot(self):
-    temp_directory = tempfile.mkdtemp()
+    temp_directory = os.path.realpath(tempfile.mkdtemp())
     try:
       test_directory = os.path.join(temp_directory, "test")
       os.makedirs(test_directory)
@@ -4675,7 +4795,7 @@ class CpplintTest(CpplintTestBase):
     # do not hardcode the 'styleguide' repository name, it could be anything.
     expected_prefix = re.sub(r'[^a-zA-Z0-9]', '_', styleguide_dir_name).upper() + '_'
     # do not have 'styleguide' repo in '/'
-    self.assertEquals('%sCPPLINT_CPPLINT_TEST_HEADER_H_' %(expected_prefix),
+    self.assertEquals('%sCPPLINT_CPPLINT_TEST_HEADER_H_' % (expected_prefix),
                       cpplint.GetHeaderGuardCPPVariable(file_path))
 
     # To run the 'relative path' tests, we must be in the directory of this test file.
@@ -4690,9 +4810,9 @@ class CpplintTest(CpplintTestBase):
                       cpplint.GetHeaderGuardCPPVariable(file_path))
 
     styleguide_rel_path = os.path.relpath(styleguide_parent_path,
-                                          this_files_path) # '../..'
+                                          this_files_path)  # '../..'
     cpplint._root = styleguide_rel_path
-    self.assertEquals('%sCPPLINT_CPPLINT_TEST_HEADER_H_' %(expected_prefix),
+    self.assertEquals('%sCPPLINT_CPPLINT_TEST_HEADER_H_' % (expected_prefix),
                       cpplint.GetHeaderGuardCPPVariable(file_path))
 
     cpplint._root = None
@@ -4701,7 +4821,7 @@ class CpplintTest(CpplintTestBase):
     os.chdir(cur_dir)
 
   def testIncludeItsHeader(self):
-    temp_directory = tempfile.mkdtemp()
+    temp_directory = os.path.realpath(tempfile.mkdtemp())
     cur_dir = os.getcwd()
     try:
       test_directory = os.path.join(temp_directory, "test")
@@ -4734,6 +4854,23 @@ class CpplintTest(CpplintTestBase):
         error_collector)
       self.assertEqual(
         0,
+        error_collector.Results().count(expected))
+
+      # Unix directory aliases are not allowed, and should trigger the
+      # "include itse header file" error
+      error_collector = ErrorCollector(self.assertTrue)
+      cpplint.ProcessFileData(
+        'test/foo.cc', 'cc',
+        [r'#include "./test/foo.h"',
+         ''
+         ],
+        error_collector)
+      expected = "{dir}/{fn}.cc should include its header file {dir}/{fn}.h{unix_text}  [build/include] [5]".format(
+          fn="foo",
+          dir=test_directory,
+          unix_text=". Relative paths like . and .. are not allowed.")
+      self.assertEqual(
+        1,
         error_collector.Results().count(expected))
 
       # This should continue to work
@@ -4785,8 +4922,8 @@ class CpplintTest(CpplintTestBase):
                       cpplint.PathSplitToList(os.path.join('a', 'b', 'c', 'd')))
 
   def testBuildHeaderGuardWithRepository(self):
-    temp_directory = tempfile.mkdtemp()
-    temp_directory2 = tempfile.mkdtemp()
+    temp_directory = os.path.realpath(tempfile.mkdtemp())
+    temp_directory2 = os.path.realpath(tempfile.mkdtemp())
     try:
       os.makedirs(os.path.join(temp_directory, ".svn"))
       trunk_dir = os.path.join(temp_directory, "trunk")
@@ -4833,8 +4970,13 @@ class CpplintTest(CpplintTestBase):
   def testBuildInclude(self):
     # Test that include statements have slashes in them.
     self.TestLint('#include "foo.h"',
-                  'Include the directory when naming .h files'
+                  'Include the directory when naming header files'
                   '  [build/include_subdir] [4]')
+    self.TestLint('#include "bar.hh"',
+                  'Include the directory when naming header files'
+                  '  [build/include_subdir] [4]')
+    self.TestLint('#include "baz.aa"', '')
+    self.TestLint('#include "dir/foo.h"', '')
     self.TestLint('#include "Python.h"', '')
     self.TestLint('#include "lua.h"', '')
 
@@ -5212,6 +5354,20 @@ class OrderOfIncludesTest(CpplintTestBase):
                      self.include_state.CheckNextIncludeOrder(
                          cpplint._C_SYS_HEADER))
 
+  def testCheckNextIncludeOrder_OtherSysThenC(self):
+    self.assertEqual('', self.include_state.CheckNextIncludeOrder(
+        cpplint._OTHER_SYS_HEADER))
+    self.assertEqual('Found C system header after other system header',
+                     self.include_state.CheckNextIncludeOrder(
+                         cpplint._C_SYS_HEADER))
+
+  def testCheckNextIncludeOrder_OtherSysThenCpp(self):
+    self.assertEqual('', self.include_state.CheckNextIncludeOrder(
+        cpplint._OTHER_SYS_HEADER))
+    self.assertEqual('Found C++ system header after other system header',
+                     self.include_state.CheckNextIncludeOrder(
+                         cpplint._CPP_SYS_HEADER))
+
   def testCheckNextIncludeOrder_LikelyThenCpp(self):
     self.assertEqual('', self.include_state.CheckNextIncludeOrder(
         cpplint._LIKELY_MY_HEADER))
@@ -5237,12 +5393,37 @@ class OrderOfIncludesTest(CpplintTestBase):
     self.assertEqual('', self.include_state.CheckNextIncludeOrder(
         cpplint._POSSIBLE_MY_HEADER))
 
+  def testCheckNextIncludeOrder_CppThenOtherSys(self):
+    self.assertEqual('', self.include_state.CheckNextIncludeOrder(
+        cpplint._CPP_SYS_HEADER))
+    self.assertEqual('', self.include_state.CheckNextIncludeOrder(
+        cpplint._OTHER_SYS_HEADER))
+
+  def testCheckNextIncludeOrder_OtherSysThenPossible(self):
+    self.assertEqual('', self.include_state.CheckNextIncludeOrder(
+        cpplint._OTHER_SYS_HEADER))
+    self.assertEqual('', self.include_state.CheckNextIncludeOrder(
+        cpplint._POSSIBLE_MY_HEADER))
+
+
   def testClassifyInclude(self):
     file_info = cpplint.FileInfo
     classify_include = cpplint._ClassifyInclude
     self.assertEqual(cpplint._C_SYS_HEADER,
                      classify_include(file_info('foo/foo.cc'),
                                       'stdio.h',
+                                      True))
+    self.assertEqual(cpplint._C_SYS_HEADER,
+                     classify_include(file_info('foo/foo.cc'),
+                                      'sys/time.h',
+                                      True))
+    self.assertEqual(cpplint._C_SYS_HEADER,
+                     classify_include(file_info('foo/foo.cc'),
+                                      'netipx/ipx.h',
+                                      True))
+    self.assertEqual(cpplint._C_SYS_HEADER,
+                     classify_include(file_info('foo/foo.cc'),
+                                      'arpa/ftp.h',
                                       True))
     self.assertEqual(cpplint._CPP_SYS_HEADER,
                      classify_include(file_info('foo/foo.cc'),
@@ -5252,6 +5433,15 @@ class OrderOfIncludesTest(CpplintTestBase):
                      classify_include(file_info('foo/foo.cc'),
                                       'typeinfo',
                                       True))
+    self.assertEqual(cpplint._C_SYS_HEADER,
+                     classify_include(file_info('foo/foo.cc'),
+                                      'foo/foo.h',
+                                      True))
+    self.assertEqual(cpplint._OTHER_SYS_HEADER,
+                     classify_include(file_info('foo/foo.cc'),
+                                      'foo/foo.h',
+                                      True,
+                                      "standardcfirst"))
     self.assertEqual(cpplint._OTHER_HEADER,
                      classify_include(file_info('foo/foo.cc'),
                                       'string',
@@ -5268,7 +5458,6 @@ class OrderOfIncludesTest(CpplintTestBase):
                      classify_include(file_info('foo/foo.h++'),
                                       'boost/any.hpp',
                                       True))
-
     self.assertEqual(cpplint._LIKELY_MY_HEADER,
                      classify_include(file_info('foo/foo.cc'),
                                       'foo/foo-inl.h',
@@ -5287,7 +5476,7 @@ class OrderOfIncludesTest(CpplintTestBase):
                                       False))
 
   def testTryDropCommonSuffixes(self):
-    cpplint._header_extensions = set([])
+    cpplint._hpp_headers = set([])
     cpplint._valid_extensions = set([])
     self.assertEqual('foo/foo', cpplint._DropCommonSuffixes('foo/foo-inl.h'))
     self.assertEqual('foo/foo', cpplint._DropCommonSuffixes('foo/foo-inl.hxx'))
@@ -5913,6 +6102,26 @@ class NestingStateTest(unittest.TestCase):
     self.UpdateWithLines(['}', '}}'])
     self.assertEquals(len(self.nesting_state.stack), 0)
 
+  def testDecoratedClass(self):
+    self.UpdateWithLines(['class Decorated_123 API A {'])
+    self.assertEquals(len(self.nesting_state.stack), 1)
+    self.assertTrue(isinstance(self.nesting_state.stack[0], cpplint._ClassInfo))
+    self.assertEquals(self.nesting_state.stack[0].name, 'A')
+    self.assertFalse(self.nesting_state.stack[0].is_derived)
+    self.assertEquals(self.nesting_state.stack[0].class_indent, 0)
+    self.UpdateWithLines(['}'])
+    self.assertEquals(len(self.nesting_state.stack), 0)
+
+  def testInnerClass(self):
+    self.UpdateWithLines(['class A::B::C {'])
+    self.assertEquals(len(self.nesting_state.stack), 1)
+    self.assertTrue(isinstance(self.nesting_state.stack[0], cpplint._ClassInfo))
+    self.assertEquals(self.nesting_state.stack[0].name, 'A::B::C')
+    self.assertFalse(self.nesting_state.stack[0].is_derived)
+    self.assertEquals(self.nesting_state.stack[0].class_indent, 0)
+    self.UpdateWithLines(['}'])
+    self.assertEquals(len(self.nesting_state.stack), 0)
+
   def testClass(self):
     self.UpdateWithLines(['class A {'])
     self.assertEquals(len(self.nesting_state.stack), 1)
@@ -6107,7 +6316,7 @@ class NestingStateTest(unittest.TestCase):
 
   def testTemplateDefaultArg(self):
     self.UpdateWithLines([
-      'template <class T, class D = default_delete<T>> class unique_ptr {',])
+      'template <class T, class D = default_delete<T>> class unique_ptr {'])
     self.assertEquals(len(self.nesting_state.stack), 1)
     self.assertTrue(self.nesting_state.stack[0], isinstance(self.nesting_state.stack[0], cpplint._ClassInfo))
 
@@ -6236,7 +6445,7 @@ class NestingStateTest(unittest.TestCase):
 class QuietTest(unittest.TestCase):
 
   def setUp(self):
-    self.temp_dir = tempfile.mkdtemp()
+    self.temp_dir = os.path.realpath(tempfile.mkdtemp())
     self.this_dir_path = os.path.abspath(self.temp_dir)
     self.python_executable = sys.executable or 'python'
     self.cpplint_test_h = os.path.join(self.this_dir_path,
@@ -6251,7 +6460,7 @@ class QuietTest(unittest.TestCase):
 
     cmd_line = [self.python_executable, cpplint_abspath] +                     \
         list(args) +                                                           \
-        [ self.cpplint_test_h ]
+        [self.cpplint_test_h]
 
     return_code = 0
     try:
@@ -6314,6 +6523,10 @@ class QuietTest(unittest.TestCase):
     self.assertNotIn("Total errors found:", output)
     # Output with no errors must be completely blank!
     self.assertEquals("", output)
+
+# class FileFilterTest(unittest.TestCase):
+#   def testFilterExcludedFiles(self):
+#     self.assertEquals([], _FilterExcludedFiles([]))
 
 # pylint: disable=C6409
 def setUp():
