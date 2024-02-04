@@ -2527,7 +2527,8 @@ def CheckHeaderFileIncluded(filename, include_state, error):
     if include_uses_unix_dir_aliases:
       message += ". Relative paths like . and .. are not allowed."
 
-  error(filename, first_include, 'build/include', 5, message)
+  if first_include:
+    error(filename, first_include, 'build/include', 5, message)
 
 
 def CheckForBadCharacters(filename, lines, error):
