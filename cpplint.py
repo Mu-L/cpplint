@@ -2506,8 +2506,8 @@ def CheckHeaderFileIncluded(filename, include_state, error):
     return
 
   first_include = message = None
+  basefilename = filename[0:len(filename) - len(fileinfo.Extension())]
   for ext in GetHeaderExtensions():
-    basefilename = filename[0:len(filename) - len(fileinfo.Extension())]
     headerfile = basefilename + '.' + ext
     if not os.path.exists(headerfile):
       continue
