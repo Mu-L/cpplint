@@ -2523,9 +2523,9 @@ def CheckHeaderFileIncluded(filename, include_state, error):
         if not first_include:
           first_include = f[1]
 
-  message = f'{fileinfo.RepositoryName()} should include its header file {headername}'
-  if include_uses_unix_dir_aliases:
-    message += ". Relative paths like . and .. are not allowed."
+    message = f'{fileinfo.RepositoryName()} should include its header file {headername}'
+    if include_uses_unix_dir_aliases:
+      message += ". Relative paths like . and .. are not allowed."
 
   error(filename, first_include, 'build/include', 5, message)
 
