@@ -12,7 +12,7 @@ Any kinds of contributions are welcome: Bug reports, Documentation, Patches. If 
   * Making tests, especially clitest, work on Windows
 * Complete tickets in our `issue tracker <https://github.com/cpplint/cpplint/issues>`_
 
-Discouraged changes:
+Here are some contributions you probably shouldn't make:
 
 * Drastic reorganization
   * Making the code conform to Google's Python style guidelines
