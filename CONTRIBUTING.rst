@@ -3,20 +3,13 @@ Contributing guide
 
 Thanks for your interest in contributing to cpplint.
 
-Any kinds of contributions are welcome: Bug reports, Documentation, Patches. If you need some ideas, you may check out some of the tasks below:
-
-* Reducing interference with other popular tools
-* Update cpplint for modern python versions
-  * Converting setup.py to a pyproject.toml
-* Porting cpplint to other environments
-  * Making tests, especially clitest, work on Windows
-* Complete tickets in our `issue tracker <https://github.com/cpplint/cpplint/issues>`_
-
-Here are some contributions you probably shouldn't make:
+Any kinds of contributions are welcome: Bug reports, Documentation, Patches. However, here are some contributions you probably shouldn't make:
 
 * Drastic reorganization
   * Making the code conform to Google's Python style guidelines
 * Features that could be regarded as a security vulnerability
+
+If you need some ideas, you may check out some of the tasks in our `issue tracker <https://github.com/cpplint/cpplint/issues>`_.
 
 Development
 -----------
