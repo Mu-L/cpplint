@@ -1,4 +1,7 @@
-flake8>=3.6.0
-radon>=2.4.0
-pylint>=1.8.4
-tox>=3.0.0
+# requirements for testing steps
+tox<5.0.0
+
+# also change in tox.ini
+pytest
+pytest-cov
+testfixtures

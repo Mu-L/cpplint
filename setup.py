@@ -1,68 +1,22 @@
 #! /usr/bin/env python
+from setuptools import setup
+import cpplint
 
-from setuptools import setup, Command
-from setuptools.command.test import test as TestCommand
-from subprocess import check_call
-from multiprocessing import cpu_count
-from distutils.spawn import find_executable
-import cpplint as cpplint
+# some pip versions bark on comments (e.g. on travis)
+def read_without_comments(filename):
+    with open(filename) as f:
+        return [line for line in f.read().splitlines() if not len(line) == 0 and not line.startswith('#')]
 
-class Test(TestCommand):
-    def run_tests(self):
-        check_call(('./cpplint_unittest.py'))
-        check_call(('./cpplint_clitest.py'))
-
-
-class Cmd(Command):
-    user_options = [
-      ('executable', 'e', 'The executable to use for the command')
-    ]
-
-    def initialize_options(self):
-        self.executable = find_executable(self.executable)
-
-    def finalize_options(self):
-        pass
-
-    def execute(self, *k):
-        check_call((self.executable,) + k)
-
-
-class Lint(Cmd):
-    description = 'Run linting of the code'
-    user_options = Cmd.user_options + [
-      ('jobs', 'j', 'Use multiple processes to speed up the linting')
-    ]
-    executable = 'pylint'
-
-    def initialize_options(self):
-        self.jobs = cpu_count()
-
-    def finalize_options(self):
-        self.jobs = int(self.jobs)
-        if self.jobs < 1:
-            raise ValueError('Jobs must be one or larger')
-
-    def run(self):
-        self.execute('-j', str(self.jobs), 'cpplint.py')
-
-
-class Format(Cmd):
-    description = 'Formats the code'
-    executable = 'yapf'
-
-    def run(self):
-        self.execute('--parallel', '--in-place', 'cpplint.py')
-
+test_required = read_without_comments('test-requirements')
 
 setup(name='cpplint',
       version=cpplint.__VERSION__,
       py_modules=['cpplint'],
       # generate platform specific start script
       entry_points={
-        'console_scripts': [
-            'cpplint = cpplint:main'
-        ]
+          'console_scripts': [
+              'cpplint = cpplint:main'
+          ]
       },
       install_requires=[],
       url='https://github.com/cpplint/cpplint',
@@ -70,31 +24,26 @@ setup(name='cpplint',
       keywords=['lint', 'python', 'c++'],
       maintainer='cpplint Developers',
       maintainer_email='see_github@nospam.com',
-      classifiers=['Programming Language :: Python',
-                   'Programming Language :: Python :: 2',
-                   'Programming Language :: Python :: 2.7',
-                   'Programming Language :: Python :: 3',
-                   'Programming Language :: Python :: 3.4',
-                   'Programming Language :: Python :: 3.5',
-                   'Programming Language :: Python :: 3.6',
-                   'Programming Language :: Python :: 3.7',
-                   'Programming Language :: C++',
-                   'Development Status :: 5 - Production/Stable',
+      classifiers=['Development Status :: 5 - Production/Stable',
                    'Environment :: Console',
-                   'Topic :: Software Development :: Quality Assurance',
-                   'License :: Freely Distributable'],
+                   'Intended Audience :: End Users/Desktop',
+                   'License :: Freely Distributable'
+                   'Natural Language :: English',
+                   'Programming Language :: Python :: 3 :: Only',
+                   'Programming Language :: Python :: 3.7',
+                   'Programming Language :: Python :: 3.8',
+                   'Programming Language :: Python :: 3.9',
+                   'Programming Language :: Python :: 3.10',
+                   'Programming Language :: Python :: 3.11',
+                   'Programming Language :: Python :: 3.12',
+                   'Programming Language :: C++',
+                   'Topic :: Software Development :: Quality Assurance'],
       description='Automated checker to ensure C++ files follow Google\'s style guide',
       long_description=open('README.rst').read(),
       license='BSD-3-Clause',
+      tests_require=test_required,
+      # extras_require allow pip install .[dev]
       extras_require={
-        'dev': [
-            'pylint',
-            'flake8',
-            'yapf',
-        ]
-      },
-      cmdclass={
-        'test': Test,
-        'lint': Lint,
-        'format': Format
+          'test': test_required,
+          'dev': read_without_comments('dev-requirements') + test_required
       })
