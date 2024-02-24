@@ -39,8 +39,7 @@ import subprocess
 import unittest
 import shutil
 import tempfile
-import pytest
-
+from pytest import mark
 from testfixtures import compare
 
 BASE_CMD = sys.executable + ' ' + os.path.abspath('./cpplint.py ')
@@ -197,7 +196,7 @@ class NoRepoSignatureTests(TemporaryFolderClassSetup, unittest.TestCase):
     def testBoostSample(self):
         self.checkAllInFolder('./samples/boost-sample', 4)
 
-    @pytest.mark.timeout(180)
+    @mark.timeout(180)
     def testProtobufSample(self):
         self.checkAllInFolder('./samples/protobuf-sample', 1)
 
