@@ -35,6 +35,7 @@
 
 import codecs
 import os
+import platform
 import random
 import re
 import shutil
@@ -42,33 +43,10 @@ import subprocess
 import sys
 import tempfile
 import unittest
+
 import pytest
 
 import cpplint
-
-try:
-  xrange          # Python 2
-except NameError:
-  #  -- pylint: disable=redefined-builtin
-  xrange = range  # Python 3
-
-try:
-  unicode
-except NameError:
-  #  -- pylint: disable=redefined-builtin
-  basestring = unicode = str
-
-try:
-  long(2)
-except NameError:
-  #  -- pylint: disable=redefined-builtin
-  long = int
-
-def unicode_escape_decode(x):
-  if sys.version_info < (3,):
-    return codecs.unicode_escape_decode(x)[0]
-  else:
-    return x
 
 def codecs_latin_encode(x):
   if sys.version_info < (3,):
@@ -90,13 +68,13 @@ class ErrorCollector(object):
     self._errors = []
     cpplint.ResetNolintSuppressions()
 
-  def __call__(self, unused_filename, linenum,
+  def __call__(self, filename, linenum,
                category, confidence, message):
     self._assert_fn(category in self._ERROR_CATEGORIES,
                     'Message "%s" has category "%s",'
                     ' which is not in _ERROR_CATEGORIES' % (message, category))
     self._SEEN_ERROR_CATEGORIES[category] = 1
-    if cpplint._ShouldPrintError(category, confidence, linenum):
+    if cpplint._ShouldPrintError(category, confidence, filename, linenum):
       self._errors.append('%s  [%s] [%d]' % (message, category, confidence))
 
   def Results(self):
@@ -152,6 +130,8 @@ class CpplintTestBase(unittest.TestCase):
   def setUp(self):
     # Allow subclasses to cheat os.path.abspath called in FileInfo class.
     self.os_path_abspath_orig = os.path.abspath
+    self.assertEqual = self.assertEqual
+    self.assertTrue = self.assertTrue
 
   def tearDown(self):
     os.path.abspath = self.os_path_abspath_orig
@@ -181,7 +161,7 @@ class CpplintTestBase(unittest.TestCase):
     cpplint.RemoveMultiLineComments('foo.h', lines, error_collector)
     lines = cpplint.CleansedLines(lines)
     nesting_state = cpplint.NestingState()
-    for i in xrange(lines.NumLines()):
+    for i in range(lines.NumLines()):
       nesting_state.Update('foo.h', lines, i, error_collector)
       cpplint.CheckStyle('foo.h', lines, i, 'h', nesting_state,
                          error_collector)
@@ -200,7 +180,7 @@ class CpplintTestBase(unittest.TestCase):
     cpplint.RemoveMultiLineComments(file_name, lines, error_collector)
     lines = cpplint.CleansedLines(lines)
     ext = file_name[file_name.rfind('.') + 1:]
-    for i in xrange(lines.NumLines()):
+    for i in range(lines.NumLines()):
       cpplint.CheckLanguage(file_name, lines, i, ext, include_state,
                             nesting_state, error_collector)
     return error_collector.Results()
@@ -226,7 +206,7 @@ class CpplintTestBase(unittest.TestCase):
     lines = code.split('\n')
     cpplint.RemoveMultiLineComments(file_name, lines, error_collector)
     lines = cpplint.CleansedLines(lines)
-    for i in xrange(lines.NumLines()):
+    for i in range(lines.NumLines()):
       cpplint.CheckForFunctionLengths(file_name, lines, i,
                                       function_state, error_collector)
     return error_collector.Results()
@@ -239,7 +219,7 @@ class CpplintTestBase(unittest.TestCase):
     lines = code.split('\n')
     cpplint.RemoveMultiLineComments(filename, lines, error_collector)
     lines = cpplint.CleansedLines(lines)
-    for i in xrange(lines.NumLines()):
+    for i in range(lines.NumLines()):
       cpplint.CheckLanguage(filename, lines, i, '.h', include_state,
                             nesting_state, error_collector)
     # We could clear the error_collector here, but this should
@@ -266,11 +246,11 @@ class CpplintTestBase(unittest.TestCase):
 
   def TestLanguageRulesCheck(self, file_name, code, expected_message):
     self.assertEqual(expected_message,
-                     self.PerformLanguageRulesCheck(file_name, code))
+                      self.PerformLanguageRulesCheck(file_name, code))
 
   def TestIncludeWhatYouUse(self, code, expected_message):
     self.assertEqual(expected_message,
-                     self.PerformIncludeWhatYouUse(code))
+                      self.PerformIncludeWhatYouUse(code))
 
   def TestBlankLinesCheck(self, lines, start_errors, end_errors):
     for extension in ['c', 'cc', 'cpp', 'cxx', 'c++', 'cu']:
@@ -298,7 +278,7 @@ class CpplintTest(CpplintTestBase):
     cpplint.RemoveMultiLineComments('foo.h', lines, error_collector)
     lines = cpplint.CleansedLines(lines)
     nesting_state = cpplint.NestingState()
-    for i in xrange(lines.NumLines()):
+    for i in range(lines.NumLines()):
       nesting_state.Update('foo.h', lines, i, error_collector)
       cpplint.CheckForNamespaceIndentation('foo.h', nesting_state,
                                            lines, i, error_collector)
@@ -312,7 +292,7 @@ class CpplintTest(CpplintTestBase):
 
     results = self.GetNamespaceResults(lines)
     self.assertEqual(results, 'Do not indent within a namespace '
-                     ' [runtime/indentation_namespace] [4]')
+                      ' [runtime/indentation_namespace] [4]')
 
   def testNameSpaceIndentationForClass(self):
     lines = ['namespace Test {',
@@ -355,8 +335,8 @@ class CpplintTest(CpplintTestBase):
   # Test get line width.
   def testGetLineWidth(self):
     self.assertEqual(0, cpplint.GetLineWidth(''))
-    self.assertEqual(10, cpplint.GetLineWidth(unicode('x') * 10))
-    self.assertEqual(16, cpplint.GetLineWidth(unicode_escape_decode('\u90fd|\u9053|\u5e9c|\u770c|\u652f\u5e81')))
+    self.assertEqual(10, cpplint.GetLineWidth(str('x') * 10))
+    self.assertEqual(16, cpplint.GetLineWidth('\u90fd|\u9053|\u5e9c|\u770c|\u652f\u5e81'))
     self.assertEqual(16, cpplint.GetLineWidth(u'都|道|府|県|支庁'))
     self.assertEqual(5 + 13 + 9, cpplint.GetLineWidth(
         u'd𝐱/dt' + u'f : t ⨯ 𝐱 → ℝ' + u't ⨯ 𝐱 → ℝ'))
@@ -378,11 +358,11 @@ class CpplintTest(CpplintTestBase):
                           'int loop(int x) {\n  return loop(x);\n}\n', r'\{'))
     # '^' matches the beginning of each line.
     self.assertEqual('x, y',
-                     cpplint._GetTextInside(
-                         '#include "inl.h"  // skip #define\n'
-                         '#define A2(x, y) a_inl_(x, y, __LINE__)\n'
-                         '#define A(x) a_inl_(x, "", __LINE__)\n',
-                         r'^\s*#define\s*\w+\('))
+                      cpplint._GetTextInside(
+                          '#include "inl.h"  // skip #define\n'
+                          '#define A2(x, y) a_inl_(x, y, __LINE__)\n'
+                          '#define A(x) a_inl_(x, "", __LINE__)\n',
+                          r'^\s*#define\s*\w+\('))
 
   def testFindNextMultiLineCommentStart(self):
     self.assertEqual(1, cpplint.FindNextMultiLineCommentStart([''], 0))
@@ -593,6 +573,7 @@ class CpplintTest(CpplintTestBase):
     error_collector = ErrorCollector(self.assertTrue)
     cpplint.ProcessFileData('test.cc', 'cc',
                             ['// Copyright 2014 Your Company.',
+                             '#include <iostream>',
                              'for (int i = 0; i != 100; ++i) {',
                              '  std::cout << i << std::endl;',
                              '};  // NOLINT',
@@ -1045,12 +1026,10 @@ class CpplintTest(CpplintTestBase):
 
   def testIncludeWhatYouUseNoImplementationFiles(self):
     code = 'std::vector<int> foo;'
-    for extension in ['h', 'hpp', 'hxx', 'h++', 'cuh']:
+    for extension in ['h', 'hpp', 'hxx', 'h++', 'cuh',
+                      'c', 'cc', 'cpp', 'cxx', 'c++', 'cu']:
       self.assertEqual('Add #include <vector> for vector<>'
                        '  [build/include_what_you_use] [4]',
-                       self.PerformIncludeWhatYouUse(code, 'foo.' + extension))
-    for extension in ['c', 'cc', 'cpp', 'cxx', 'c++', 'cu']:
-      self.assertEqual('',
                        self.PerformIncludeWhatYouUse(code, 'foo.' + extension))
 
   def testIncludeWhatYouUse(self):
@@ -1138,6 +1117,12 @@ class CpplintTest(CpplintTestBase):
            bool foobar = min<int>(0,1);
         """,
         'Add #include <algorithm> for min  [build/include_what_you_use] [4]')
+    self.TestIncludeWhatYouUse(
+        'cout << "hello world" << endl;',
+        'Add #include <iostream> for cout  [build/include_what_you_use] [4]')
+    self.TestIncludeWhatYouUse(
+        'printf("hello world");',
+        'Add #include <cstdio> for printf  [build/include_what_you_use] [4]')
     self.TestIncludeWhatYouUse(
         'void a(const string &foobar);',
         'Add #include <string> for string  [build/include_what_you_use] [4]')
@@ -1264,50 +1249,6 @@ class CpplintTest(CpplintTestBase):
         auto res = map<Bar>();
         """,
         '')
-
-    # Test the UpdateIncludeState code path.
-    mock_header_contents = ['#include "blah/foo.h"', '#include "blah/bar.h"']
-    message = self.PerformIncludeWhatYouUse(
-        '#include "blah/a.h"',
-        filename='blah/a.cc',
-        io=MockIo(mock_header_contents))
-    self.assertEqual(message, '')
-
-    mock_header_contents = ['#include <set>']
-    message = self.PerformIncludeWhatYouUse(
-        """#include "blah/a.h"
-           std::set<int> foo;""",
-        filename='blah/a.cc',
-        io=MockIo(mock_header_contents))
-    self.assertEqual(message, '')
-
-    # Make sure we can find the correct header file if the cc file seems to be
-    # a temporary file generated by Emacs's flymake.
-    mock_header_contents = ['']
-    message = self.PerformIncludeWhatYouUse(
-        """#include "blah/a.h"
-           std::set<int> foo;""",
-        filename='blah/a_flymake.cc',
-        io=MockIo(mock_header_contents))
-    self.assertEqual(message, 'Add #include <set> for set<>  '
-                      '[build/include_what_you_use] [4]')
-
-    # If there's just a cc and the header can't be found then it's ok.
-    message = self.PerformIncludeWhatYouUse(
-        """#include "blah/a.h"
-           std::set<int> foo;""",
-        filename='blah/a.cc')
-    self.assertEqual(message, '')
-
-    # Make sure we find the headers with relative paths.
-    mock_header_contents = ['']
-    message = self.PerformIncludeWhatYouUse(
-        """#include "%s/a.h"
-           std::set<int> foo;""" % os.path.basename(os.getcwd()),
-        filename='a.cc',
-        io=MockIo(mock_header_contents))
-    self.assertEqual(message, 'Add #include <set> for set<>  '
-                      '[build/include_what_you_use] [4]')
 
   def testFilesBelongToSameModule(self):
     f = cpplint.FilesBelongToSameModule
@@ -2565,6 +2506,8 @@ class CpplintTest(CpplintTestBase):
     cpplint.ProcessFileData(
         'foo.cc', 'cc',
         ['// Copyright 2014 Your Company. All Rights Reserved.',
+         '#include <string>',
+         '#include <utility>',
          'void swap(int &x,',
          '          int &y) {',
          '}',
@@ -2763,6 +2706,39 @@ class CpplintTest(CpplintTestBase):
     self.TestLint('sizeof(foo)', '')
     self.TestLint('sizeof foo', '')
     self.TestLint('sizeof (foo)', '')
+
+  def testReplaceAlternateTokens(self):
+    assert cpplint.ReplaceAlternateTokens('tor or orc') == 'tor || orc'
+    assert cpplint.ReplaceAlternateTokens('orc or tor') == 'orc || tor'
+    assert cpplint.ReplaceAlternateTokens('tor or (orc)') == 'tor || (orc)'
+    assert cpplint.ReplaceAlternateTokens('tor or(orc)') == 'tor ||(orc)'
+    assert cpplint.ReplaceAlternateTokens('sand and(android)') == \
+                                          'sand &&(android)'
+    assert cpplint.ReplaceAlternateTokens('(sand) and (android)') == \
+                                          '(sand) && (android)'
+    assert cpplint.ReplaceAlternateTokens(' not note') == ' !note'
+    assert cpplint.ReplaceAlternateTokens(')not note') == ')!note'
+    assert cpplint.ReplaceAlternateTokens('(not note') == '(!note'
+    assert cpplint.ReplaceAlternateTokens(' not(note)') == ' !(note)'
+    assert cpplint.ReplaceAlternateTokens(' not (splinot)') == ' !(splinot)'
+    assert cpplint.ReplaceAlternateTokens('tor and orc or android') == \
+                                          'tor && orc || android'
+    assert cpplint.ReplaceAlternateTokens('tor or orc and ands not note') == \
+                                          'tor || orc && ands !note'
+
+  def testSpacingAfterAlternateToken(self):
+    try:
+      cpplint._cpplint_state.AddFilters('-readability/alt_tokens')
+      self.TestLint('if (foo or (bar) or foobar) {', '')
+      self.TestLint('if (foo or (bar)) {', '')
+      self.TestLint('if ((foo) or (bar)) {', '')
+      self.TestLint('if (not foo) {', '')
+      self.TestLint('if (not (foo)) {', '')
+      self.TestLint('if (not(foo)) {', '')
+      self.TestLint('if ((foo)or(bar)) {', 'Missing spaces around ||'
+                    '  [whitespace/operators] [3]')
+    finally:
+      cpplint._cpplint_state.SetFilters('')
 
   def testSpacingBeforeBraces(self):
     self.TestLint('if (foo){', 'Missing space before {'
@@ -3164,6 +3140,7 @@ class CpplintTest(CpplintTestBase):
     error_collector = ErrorCollector(self.assertTrue)
     cpplint.ProcessFileData('foo.cc', 'cc',
                             ['// Copyright 2014 Your Company.',
+                             '#include <string>',
                              'string Class',
                              '::MemberFunction1();',
                              'string Class::',
@@ -3351,10 +3328,7 @@ class CpplintTest(CpplintTestBase):
   def testInvalidUtf8(self):
     def DoTest(self, raw_bytes, has_invalid_utf8):
       error_collector = ErrorCollector(self.assertTrue)
-      if sys.version_info < (3,):
-          unidata = unicode(raw_bytes, 'utf8', 'replace').split('\n')
-      else:
-          unidata = str(raw_bytes, 'utf8', 'replace').split('\n')
+      unidata = str(raw_bytes, 'utf8', 'replace').split('\n')
       cpplint.ProcessFileData(
           'foo.cc', 'cc',
           unidata,
@@ -3377,7 +3351,7 @@ class CpplintTest(CpplintTestBase):
   def testBadCharacters(self):
     # Test for NUL bytes only
     error_collector = ErrorCollector(self.assertTrue)
-    cpplint.ProcessFileData('nul.cc', 'cc',
+    cpplint.ProcessFileData('nul_input.cc', 'cc',
                             ['// Copyright 2014 Your Company.',
                              '\0', ''], error_collector)
     self.assertEqual(
@@ -3388,10 +3362,7 @@ class CpplintTest(CpplintTestBase):
     # the same line.
     error_collector = ErrorCollector(self.assertTrue)
     raw_bytes = codecs_latin_encode('\xe9x\0')
-    if sys.version_info < (3,):
-      unidata = unicode(raw_bytes, 'utf8', 'replace')
-    else:
-      unidata = str(raw_bytes, 'utf8', 'replace')
+    unidata = str(raw_bytes, 'utf8', 'replace')
     cpplint.ProcessFileData(
         'nul_utf8.cc', 'cc',
         ['// Copyright 2014 Your Company.',
@@ -3757,6 +3728,9 @@ class CpplintTest(CpplintTestBase):
     self.TestLint('operator,()', '')
     self.TestLint('operator,(a,b)',
                   'Missing space after ,  [whitespace/comma] [3]')
+    self.TestLint('__VA_OPT__(,)', '')
+    self.TestLint('__VA_OPT__ (,)',
+                  'Extra space before ( in function call  [whitespace/parens] [4]')
 
   def testEqualsOperatorSpacing(self):
     self.TestLint('int tmp= a;',
@@ -4481,6 +4455,55 @@ class CpplintTest(CpplintTestBase):
       cpplint._cpplint_state.filters = old_filters
       cpplint._DEFAULT_FILTERS = default_filters
 
+  def testFileSpecificFilter(self):
+    old_filters = cpplint._cpplint_state.filters
+    try:
+      test_code = """
+                  class Foo {
+                    Foo(int f)
+                    {
+                    }
+                  };"""
+      cpplint._cpplint_state.SetFilters('')
+      self.TestMultiLineLint(
+          test_code,
+          ['Single-parameter constructors should be marked explicit.'
+          '  [runtime/explicit] [5]',
+          '{ should almost always be at the end of the previous line'
+          '  [whitespace/braces] [4]']
+          )
+
+      cpplint._cpplint_state.SetFilters('-runtime/explicit:foo.h')
+      self.TestMultiLineLint(
+          test_code,
+          '{ should almost always be at the end of the previous line'
+          '  [whitespace/braces] [4]'
+          )
+
+      cpplint._cpplint_state.SetFilters('-runtime/explicit:foo.h:2')
+      self.TestMultiLineLint(
+          test_code,
+          '{ should almost always be at the end of the previous line'
+          '  [whitespace/braces] [4]'
+          )
+
+      cpplint._cpplint_state.SetFilters('-runtime/explicit:foo.h:14,-whitespace/braces:otherfile.h:3')
+      self.TestMultiLineLint(
+          test_code,
+          ['Single-parameter constructors should be marked explicit.'
+          '  [runtime/explicit] [5]',
+          '{ should almost always be at the end of the previous line'
+          '  [whitespace/braces] [4]']
+          )
+
+      cpplint._cpplint_state.SetFilters('-runtime/explicit:foo.h:2,-whitespace/braces:foo.h:3')
+      self.TestMultiLineLint(
+          test_code,
+          ''
+          )
+    finally:
+      cpplint._cpplint_state.filters = old_filters
+
   def testDuplicateHeader(self):
     error_collector = ErrorCollector(self.assertTrue)
     cpplint.ProcessFileData('path/self.cc', 'cc',
@@ -4943,6 +4966,9 @@ class CpplintTest(CpplintTestBase):
         'test/foo.cc', 'cc',
         [''],
         error_collector)
+
+      if platform.system() == 'Windows':
+        test_directory = test_directory.replace('\\', '/')
       expected = "{dir}/{fn}.cc should include its header file {dir}/{fn}.h  [build/include] [5]".format(
           fn="foo",
           dir=test_directory)
@@ -5005,6 +5031,18 @@ class CpplintTest(CpplintTestBase):
         0,
         error_collector.Results().count(expected))
 
+      # Test edge case in which multiple files have the same base name
+      open(os.path.join(test_directory, 'foo.hpp'), 'a').close()
+      cpplint.ProcessFileData(
+        'test/foo.cc', 'cc',
+        [r'#include "foo.hpp"',
+         ''
+         ],
+        error_collector)
+      self.assertEqual(
+        0,
+        error_collector.Results().count(expected))
+
     finally:
       # Restore previous CWD.
       os.chdir(cur_dir)
@@ -5029,7 +5067,15 @@ class CpplintTest(CpplintTestBase):
   def testBuildHeaderGuardWithRepository(self):
     temp_directory = os.path.realpath(tempfile.mkdtemp())
     temp_directory2 = os.path.realpath(tempfile.mkdtemp())
+
+    # On Windows, os.path.relpath fails when the input is on
+    # a different drive than the current drive.
+    # In GitHub Actions CI, TEMP is set to C: drive, while the
+    # repository clone is on D: drive.
+    current_directory = os.getcwd()
     try:
+      os.chdir(temp_directory)
+
       os.makedirs(os.path.join(temp_directory, ".svn"))
       trunk_dir = os.path.join(temp_directory, "trunk")
       os.makedirs(trunk_dir)
@@ -5067,6 +5113,7 @@ class CpplintTest(CpplintTestBase):
                         cpplint.GetHeaderGuardCPPVariable(file_path))
 
     finally:
+      os.chdir(current_directory)
       shutil.rmtree(temp_directory)
       shutil.rmtree(temp_directory2)
       cpplint._repository = None
@@ -5111,6 +5158,7 @@ class CpplintTest(CpplintTestBase):
     cpplint.ProcessFileData(
         'foo.cc', 'cc',
         ['// Copyright 2014 Your Company.',
+         '#include <cstdio>',
          r'printf("\\%%%d", value);',
          r'printf(R"(\[)");',
          r'printf(R"(\[%s)", R"(\])");',
@@ -5267,7 +5315,7 @@ class CpplintTest(CpplintTestBase):
     self.TestLint('snprintf(fisk, 1, format)',
                   'If you can, use sizeof(fisk) instead of 1 as the 2nd arg '
                   'to snprintf.  [runtime/printf] [3]')
-class Cxx11Test(CpplintTestBase):
+class CxxTest(CpplintTestBase):
 
   def Helper(self, package, extension, lines, count):
     filename = package + '/foo.' + extension
@@ -5289,46 +5337,24 @@ class Cxx11Test(CpplintTestBase):
     error_list = collector.ResultList()
     self.assertEqual(count, len(error_list), error_list)
 
-  def TestCxx11Feature(self, code, expected_error):
+  def TestCxxFeature(self, code, expected_error):
     lines = code.split('\n')
     collector = ErrorCollector(self.assertTrue)
     cpplint.RemoveMultiLineComments('foo.h', lines, collector)
     clean_lines = cpplint.CleansedLines(lines)
-    cpplint.FlagCxx11Features('foo.cc', clean_lines, 0, collector)
+    cpplint.FlagCxxHeaders('foo.cc', clean_lines, 0, collector)
     self.assertEqual(expected_error, collector.Results())
 
   def testBlockedHeaders(self):
-    self.TestCxx11Feature('#include <tr1/regex>',
-                          'C++ TR1 headers such as <tr1/regex> are '
-                          'unapproved.  [build/c++tr1] [5]')
-    self.TestCxx11Feature('#include <mutex>',
-                          '<mutex> is an unapproved C++11 header.'
+    self.TestCxxFeature('#include <ratio>',
+                          '<ratio> is an unapproved C++11 header.'
                           '  [build/c++11] [5]')
-
-  def testBlockedClasses(self):
-    self.TestCxx11Feature('std::alignment_of<T>',
-                          'std::alignment_of is an unapproved '
-                          'C++11 class or function.  Send c-style an example '
-                          'of where it would make your code more readable, '
-                          'and they may let you use it.'
+    self.TestCxxFeature('#include <fenv.h>',
+                          '<fenv.h> is an unapproved C++11 header.'
                           '  [build/c++11] [5]')
-    self.TestCxx11Feature('std::alignment_offer', '')
-    self.TestCxx11Feature('mystd::alignment_of', '')
-    self.TestCxx11Feature('std::binomial_distribution', '')
-
-  def testBlockedFunctions(self):
-    self.TestCxx11Feature('std::alignment_of<int>',
-                          'std::alignment_of is an unapproved '
-                          'C++11 class or function.  Send c-style an example '
-                          'of where it would make your code more readable, '
-                          'and they may let you use it.'
-                          '  [build/c++11] [5]')
-    # Missed because of the lack of "std::".  Compiles because ADL
-    # looks in the namespace of my_shared_ptr, which (presumably) is
-    # std::.  But there will be a lint error somewhere in this file
-    # since my_shared_ptr had to be defined.
-    self.TestCxx11Feature('static_pointer_cast<Base>(my_shared_ptr)', '')
-    self.TestCxx11Feature('std::declval<T>()', '')
+    self.TestCxxFeature('#include <filesystem>',
+                          '<filesystem> is an unapproved C++17 header.'
+                          '  [build/c++17] [5]')
 
   def testExplicitMakePair(self):
     self.TestLint('make_pair', '')
@@ -5345,26 +5371,11 @@ class Cxx11Test(CpplintTestBase):
                   '  [build/explicit_make_pair] [4]')
     self.TestLint('my_make_pair<int, int>', '')
 
-class Cxx14Test(CpplintTestBase):
-
-  def TestCxx14Feature(self, code, expected_error):
-    lines = code.split('\n')
-    collector = ErrorCollector(self.assertTrue)
-    cpplint.RemoveMultiLineComments('foo.h', lines, collector)
-    clean_lines = cpplint.CleansedLines(lines)
-    cpplint.FlagCxx14Features('foo.cc', clean_lines, 0, collector)
-    self.assertEqual(expected_error, collector.Results())
-
-  def testBlockedHeaders(self):
-    self.TestCxx14Feature('#include <scoped_allocator>',
-                          '<scoped_allocator> is an unapproved C++14 header.'
-                           '  [build/c++14] [5]')
-    self.TestCxx14Feature('#include <shared_mutex>',
-                          '<shared_mutex> is an unapproved C++14 header.'
-                          '  [build/c++14] [5]')
-
 
 class CleansedLinesTest(unittest.TestCase):
+
+  def setUp(self):
+    self.assertEqual = self.assertEqual
 
   def testInit(self):
     lines = ['Line 1',
@@ -5378,18 +5389,18 @@ class CleansedLinesTest(unittest.TestCase):
     self.assertEqual(5, clean_lines.NumLines())
 
     self.assertEqual(['Line 1',
-                      'Line 2',
-                      'Line 3',
-                      'Line 4',
-                      'Line 5 "foo"'],
-                     clean_lines.lines)
+                       'Line 2',
+                       'Line 3',
+                       'Line 4',
+                       'Line 5 "foo"'],
+                      clean_lines.lines)
 
     self.assertEqual(['Line 1',
-                      'Line 2',
-                      'Line 3',
-                      'Line 4',
-                      'Line 5 ""'],
-                     clean_lines.elided)
+                       'Line 2',
+                       'Line 3',
+                       'Line 4',
+                       'Line 5 ""'],
+                      clean_lines.elided)
 
   def testInitEmpty(self):
     clean_lines = cpplint.CleansedLines([])
@@ -5433,9 +5444,9 @@ class CleansedLinesTest(unittest.TestCase):
     self.assertEqual('123.45', collapse('1\'23.4\'5'))
 
     self.assertEqual('StringReplace(body, "", "");',
-                     collapse('StringReplace(body, "\\\\", "\\\\\\\\");'))
+                      collapse('StringReplace(body, "\\\\", "\\\\\\\\");'))
     self.assertEqual('\'\' ""',
-                     collapse('\'"\' "foo"'))
+                      collapse('\'"\' "foo"'))
 
 
 class OrderOfIncludesTest(CpplintTestBase):
@@ -5750,6 +5761,7 @@ class CheckForFunctionLengthsTest(CpplintTestBase):
 
   def setUp(self):
     # Reducing these thresholds for the tests speeds up tests significantly.
+    CpplintTestBase.setUp(self)
     self.old_normal_trigger = cpplint._FunctionState._NORMAL_TRIGGER
     self.old_test_trigger = cpplint._FunctionState._TEST_TRIGGER
 
@@ -5768,7 +5780,7 @@ class CheckForFunctionLengthsTest(CpplintTestBase):
       expected_message: Message expected to be generated by the C++ code.
     """
     self.assertEqual(expected_message,
-                     self.PerformFunctionLengthsCheck(code))
+                      self.PerformFunctionLengthsCheck(code))
 
   def TriggerLines(self, error_level):
     """Return number of lines needed to trigger a function length warning.
@@ -6101,6 +6113,7 @@ def TrimExtraIndent(text_block):
 class CloseExpressionTest(unittest.TestCase):
 
   def setUp(self):
+    self.assertEqual = self.assertEqual
     self.lines = cpplint.CleansedLines(
         #           1         2         3         4         5
         # 0123456789012345678901234567890123456789012345678901234567890
@@ -6176,7 +6189,7 @@ class NestingStateTest(unittest.TestCase):
 
   def UpdateWithLines(self, lines):
     clean_lines = cpplint.CleansedLines(lines)
-    for line in xrange(clean_lines.NumLines()):
+    for line in range(clean_lines.NumLines()):
       self.nesting_state.Update('test.cc',
                                 clean_lines, line, self.error_collector)
 
@@ -6555,6 +6568,7 @@ class QuietTest(unittest.TestCase):
     self.python_executable = sys.executable or 'python'
     self.cpplint_test_h = os.path.join(self.this_dir_path,
                                        'cpplint_test_header.h')
+    self.assertEqual = self.assertEqual
     open(self.cpplint_test_h, 'w').close()
 
   def tearDown(self):
