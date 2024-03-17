@@ -130,8 +130,6 @@ class CpplintTestBase(unittest.TestCase):
   def setUp(self):
     # Allow subclasses to cheat os.path.abspath called in FileInfo class.
     self.os_path_abspath_orig = os.path.abspath
-    self.assertEqual = self.assertEqual
-    self.assertTrue = self.assertTrue
 
   def tearDown(self):
     os.path.abspath = self.os_path_abspath_orig
@@ -3278,12 +3276,10 @@ class CpplintTest(CpplintTestBase):
     # you can see by evaluating codecs.getencoder('utf8')(u'\ufffd')).
     DoTest(self, codecs_latin_encode('\xef\xbf\xbd\n'), True)
 
-  @unittest.skipIf(platform.system() == 'Windows',
-                   'Skipping test on Windows because it hangs')
   def testBadCharacters(self):
     # Test for NUL bytes only
     error_collector = ErrorCollector(self.assertTrue)
-    cpplint.ProcessFileData('nul.cc', 'cc',
+    cpplint.ProcessFileData('nul_input.cc', 'cc',
                             ['// Copyright 2014 Your Company.',
                              '\0', ''], error_collector)
     self.assertEqual(
@@ -5006,12 +5002,18 @@ class CpplintTest(CpplintTestBase):
     self.assertEqual(['a', 'b', 'c', 'd'],
                       cpplint.PathSplitToList(os.path.join('a', 'b', 'c', 'd')))
 
-  @unittest.skipIf(platform.system() == 'Windows',
-                   'Skipping test on Windows because realpath can fail if mkdtemp uses D:')
   def testBuildHeaderGuardWithRepository(self):
     temp_directory = os.path.realpath(tempfile.mkdtemp())
     temp_directory2 = os.path.realpath(tempfile.mkdtemp())
+
+    # On Windows, os.path.relpath fails when the input is on
+    # a different drive than the current drive.
+    # In GitHub Actions CI, TEMP is set to C: drive, while the
+    # repository clone is on D: drive.
+    current_directory = os.getcwd()
     try:
+      os.chdir(temp_directory)
+
       os.makedirs(os.path.join(temp_directory, ".svn"))
       trunk_dir = os.path.join(temp_directory, "trunk")
       os.makedirs(trunk_dir)
@@ -5049,6 +5051,7 @@ class CpplintTest(CpplintTestBase):
                         cpplint.GetHeaderGuardCPPVariable(file_path))
 
     finally:
+      os.chdir(current_directory)
       shutil.rmtree(temp_directory)
       shutil.rmtree(temp_directory2)
       cpplint._repository = None
@@ -5308,9 +5311,6 @@ class CxxTest(CpplintTestBase):
 
 
 class CleansedLinesTest(unittest.TestCase):
-
-  def setUp(self):
-    self.assertEqual = self.assertEqual
 
   def testInit(self):
     lines = ['Line 1',
@@ -6048,7 +6048,6 @@ def TrimExtraIndent(text_block):
 class CloseExpressionTest(unittest.TestCase):
 
   def setUp(self):
-    self.assertEqual = self.assertEqual
     self.lines = cpplint.CleansedLines(
         #           1         2         3         4         5
         # 0123456789012345678901234567890123456789012345678901234567890
@@ -6121,7 +6120,6 @@ class NestingStateTest(unittest.TestCase):
   def setUp(self):
     self.nesting_state = cpplint.NestingState()
     self.error_collector = ErrorCollector(self.assertTrue)
-    self.assertEqual = self.assertEqual
 
   def UpdateWithLines(self, lines):
     clean_lines = cpplint.CleansedLines(lines)
@@ -6504,7 +6502,6 @@ class QuietTest(unittest.TestCase):
     self.python_executable = sys.executable or 'python'
     self.cpplint_test_h = os.path.join(self.this_dir_path,
                                        'cpplint_test_header.h')
-    self.assertEqual = self.assertEqual
     open(self.cpplint_test_h, 'w').close()
 
   def tearDown(self):
