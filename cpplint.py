@@ -964,18 +964,16 @@ class ErrorSuppressions:
 
   def __init__(self):
     self._suppressions = collections.defaultdict(list)
-    self._open_block_suppressions = []
+    self._open_block_suppression = None
 
   def _AddSuppression(self, category, line_range):
     suppressed = self._suppressions[category]
     if not (suppressed and suppressed[-1].ContainsRange(line_range)):
       suppressed.append(line_range)
-      return True
-    return False
 
   def GetOpenBlockStart(self):
     """:return: The start of the current open block or `-1` if there is not an open block"""
-    return self._open_block_suppressions[0].begin if self._open_block_suppressions else -1
+    return self._open_block_suppression.begin if self._open_block_suppression else -1
 
   def AddGlobalSuppression(self, category):
     """Add a suppression for `category` which is suppressed for the whole file"""
@@ -987,15 +985,15 @@ class ErrorSuppressions:
 
   def StartBlockSuppression(self, category, linenum):
     """Start a suppression block for `category` on `linenum`. inclusive"""
-    line_range = self.LineRange(linenum, math.inf)
-    if self._AddSuppression(category, line_range):
-      self._open_block_suppressions.append(line_range)
+    if self._open_block_suppression is None:
+      self._open_block_suppression = self.LineRange(linenum, math.inf)
+    self._AddSuppression(category, self._open_block_suppression)
 
   def EndBlockSuppression(self, linenum):
     """End the current block suppression on `linenum`. inclusive"""
-    for suppression in self._open_block_suppressions:
-      suppression.end = linenum
-    self._open_block_suppressions.clear()
+    if self._open_block_suppression:
+      self._open_block_suppression.end = linenum
+      self._open_block_suppression = None
 
   def IsSuppressed(self, category, linenum):
     """:return: `True` if `category` is suppressed for `linenum`"""
@@ -1004,12 +1002,12 @@ class ErrorSuppressions:
 
   def HasOpenBlock(self):
     """:return: `True` if a block suppression was started but not ended"""
-    return bool(self._open_block_suppressions)
+    return self._open_block_suppression is not None
 
   def Clear(self):
     """Clear all current error suppressions"""
     self._suppressions.clear()
-    self._open_block_suppressions.clear()
+    self._open_block_suppression = None
 
 _error_suppressions = ErrorSuppressions()
 
@@ -1075,34 +1073,34 @@ def ParseNolintSuppressions(filename, raw_line, linenum, error):
   if matched:
     no_lint_type = matched.group(1)
     if no_lint_type == 'NEXTLINE':
-      def process_category(category):
+      def ProcessCategory(category):
         _error_suppressions.AddLineSuppression(category, linenum + 1)
     elif no_lint_type == 'BEGIN':
       if _error_suppressions.HasOpenBlock():
         error(filename, linenum, 'readability/nolint', 5,
-              'NONLINT block already defined on line %s' % _error_suppressions.GetOpenBlockStart())
+              f'NONLINT block already defined on line {_error_suppressions.GetOpenBlockStart()}')
 
-      def process_category(category):
+      def ProcessCategory(category):
         _error_suppressions.StartBlockSuppression(category, linenum)
     elif no_lint_type == 'END':
       if not _error_suppressions.HasOpenBlock():
         error(filename, linenum, 'readability/nolint', 5, 'Not in a NOLINT block')
 
-      def process_category(category):
+      def ProcessCategory(category):
         if category is not None:
           error(filename, linenum, 'readability/nolint', 5,
-                'NOLINT categories not supported in block END: %s' % category)
+                f'NOLINT categories not supported in block END: {category}')
         _error_suppressions.EndBlockSuppression(linenum)
     else:
-      def process_category(category):
+      def ProcessCategory(category):
         _error_suppressions.AddLineSuppression(category, linenum)
     categories = matched.group(2)
     if categories in (None, '(*)'):  # => "suppress all"
-      process_category(None)
+      ProcessCategory(None)
     elif categories.startswith('(') and categories.endswith(')'):
       for category in set(map(lambda c: c.strip(), categories[1:-1].split(','))):
         if category in _ERROR_CATEGORIES:
-          process_category(category)
+          ProcessCategory(category)
         elif any(c for c in _OTHER_NOLINT_CATEGORY_PREFIXES if category.startswith(c)):
           # Ignore any categories from other tools.
           pass
